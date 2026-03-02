@@ -71,19 +71,25 @@ export class CDPConnection {
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
       ]);
 
+      // Log all targets for debugging
+      console.log(`Port ${port}: Available targets:`, targets.map((t: any) => `[${t.type}] ${t.title} | ${t.url}`));
+
       // Priority: workbench (main window where buttons are) > Launchpad > jetski-agent
       const workbench = targets.find(
-        (t: any) => t.type === 'page' && t.title.includes('Antigravity') && t.url.includes('workbench.html')
+        (t: any) => t.type === 'page' && t.url && t.url.includes('workbench.html')
       );
       const launchpad = targets.find(
         (t: any) => t.type === 'page' && t.title === 'Launchpad'
       );
       const jetskiAgent = targets.find(
-        (t: any) => t.type === 'page' && t.url.includes('jetski-agent')
+        (t: any) => t.type === 'page' && t.url && t.url.includes('jetski-agent')
       );
-      // Fallback: any VS Code/Antigravity page
+      // Fallback: any page that's not a devtools or extension host page
       const anyPage = targets.find(
-        (t: any) => t.type === 'page'
+        (t: any) => t.type === 'page' &&
+          !t.url?.includes('devtools://') &&
+          !t.url?.includes('chrome-extension://') &&
+          !t.url?.startsWith('about:')
       );
 
       const antigravityTarget = workbench || launchpad || jetskiAgent || anyPage;

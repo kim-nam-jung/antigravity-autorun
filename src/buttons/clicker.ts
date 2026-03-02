@@ -126,8 +126,20 @@ export class ButtonClicker {
       function isTargetButton(element) {
         if (!element) return false;
 
+        // Check if disabled or hidden
+        if (element.disabled || 
+            element.getAttribute('disabled') !== null || 
+            element.getAttribute('aria-disabled') === 'true' ||
+            element.closest('[disabled]') ||
+            element.closest('[aria-disabled="true"]') ||
+            element.getBoundingClientRect().width === 0 ||
+            getComputedStyle(element).visibility === 'hidden') {
+          return false;
+        }
+
         const tagName = element.tagName?.toLowerCase();
-        const text = (element.textContent || '').trim();
+        // Include aria-label and title for icon-only buttons
+        const text = ((element.textContent || '') + ' ' + (element.getAttribute('aria-label') || '') + ' ' + (element.getAttribute('title') || '')).trim();
         const role = element.getAttribute('role');
 
         // Must be clickable
@@ -174,13 +186,32 @@ export class ButtonClicker {
         }, CONFIG.delay);
       }
 
-      // Throttle function
-      let lastClickTime = 0;
+      // Queue-based clicker to avoid dropping concurrent buttons
+      let isClicking = false;
+      const clickQueue = [];
+
+      function processQueue() {
+        if (isClicking || clickQueue.length === 0) return;
+        isClicking = true;
+
+        const button = clickQueue.shift();
+
+        // Double check it's still in the DOM and visible right before clicking
+        if (document.body.contains(button) && button.getBoundingClientRect().width > 0) {
+          clickButton(button);
+        }
+
+        setTimeout(() => {
+          isClicking = false;
+          processQueue();
+        }, CONFIG.delay);
+      }
+
       function throttledClick(button) {
-        const now = Date.now();
-        if (now - lastClickTime < CONFIG.delay) return;
-        lastClickTime = now;
-        clickButton(button);
+        if (!clickQueue.includes(button)) {
+          clickQueue.push(button);
+          processQueue();
+        }
       }
 
       // Scan for buttons
@@ -224,6 +255,9 @@ export class ButtonClicker {
         subtree: true,
       });
 
+      // Expose scan function globally so polling can call it
+      window.__antigravityAutorunScan = scanForButtons;
+
       // Initial scan
       scanForButtons();
 
@@ -258,15 +292,16 @@ export class ButtonClicker {
       }
 
       try {
-        // Re-inject observer if needed
-        if (!this.observerInjected) {
+        // Re-inject observer if it's gone (page reload, etc.)
+        const alive = await this.connection.evaluate(`!!window.__antigravityAutorunObserver`);
+        if (!alive?.result?.value) {
           await this.injectObserver();
         }
 
         // Trigger manual scan
         await this.connection.evaluate(`
-          if (typeof scanForButtons === 'function') {
-            scanForButtons();
+          if (typeof window.__antigravityAutorunScan === 'function') {
+            window.__antigravityAutorunScan();
           }
         `);
       } catch (error) {

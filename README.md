@@ -1,10 +1,8 @@
 # Antigravity Autorun
 
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](#) [![License](https://img.shields.io/badge/license-MIT-green.svg)](#)
-
 > True hands-free automation for your Antigravity Agent.
 
-**Antigravity Autorun** is a lightweight VS Code extension that automatically clicks interactive buttons (Run, Retry, Accept, Allow) in the Antigravity IDE. Once enabled, your AI agent runs completely autonomously without waiting for manual confirmation clicks.
+**Antigravity Autorun** is a lightweight VS Code extension that automatically clicks interactive buttons in the Antigravity IDE. Once enabled, your AI agent runs completely autonomously without waiting for manual confirmation clicks.
 
 ---
 
@@ -16,6 +14,7 @@
 - **Smart Auto-scroll** — Scrolls hidden buttons into view before clicking so nothing gets missed.
 - **Safety Filters** — Blocked commands (e.g., `rm -rf /`, `sudo rm`) are never auto-accepted.
 - **Auto-reconnect** — If the CDP connection drops, the extension automatically reconnects.
+- **Auto-restart** — If Antigravity is not running with CDP mode, the extension offers to restart it automatically.
 
 ---
 
@@ -29,11 +28,11 @@ The extension connects to Antigravity via Chrome DevTools Protocol (CDP). Launch
 antigravity --remote-debugging-port=9222
 ```
 
-If you forget, the extension will offer to restart Antigravity automatically when you enable it.
+If you forget, the extension will offer to restart Antigravity automatically.
 
 ### 2. Toggle Autorun
 
-Look for the status bar item in the bottom-right corner of VS Code:
+Look for the status bar item in the bottom-right corner:
 
 | Status | Meaning |
 |--------|---------|
@@ -55,23 +54,21 @@ You can also use the Command Palette (`Ctrl+Shift+P`):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `antigravityAutorun.enabled` | `true` | Auto-start on VS Code launch |
+| `antigravityAutorun.enabled` | `true` | Auto-start on launch |
 | `antigravityAutorun.cdpPort` | `9222` | CDP port for Antigravity connection |
 | `antigravityAutorun.delay` | `100` | Delay (ms) before clicking a button |
 | `antigravityAutorun.autoScroll` | `true` | Scroll buttons into view before clicking |
-| `antigravityAutorun.blockedCommands` | see below | Commands that will never be auto-accepted |
+| `antigravityAutorun.blockedCommands` | see below | Commands that will never be auto-run |
 
 **Default blocked commands:**
 ```json
 ["rm -rf /", "sudo rm", "format", "del /"]
 ```
 
-You can customize this list in VS Code Settings under `antigravityAutorun.blockedCommands`.
-
 ---
 
 ## Known Limitations
 
 - Requires Antigravity to be running with `--remote-debugging-port` flag enabled.
-- If Antigravity is updated, you may need to run **Reconnect CDP** from the Command Palette.
 - CDP port defaults to `9222`, with automatic fallback to `9223`, `9224`, `9225`.
+- If Antigravity is updated, run **Reconnect CDP** from the Command Palette.

@@ -21,6 +21,7 @@ const ANTIGRAVITY_PATHS = [
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Antigravity Autorun is activating...');
+  vscode.window.showInformationMessage('Antigravity Autorun: activating...');
 
   // Initialize UI
   statusBarUI = new StatusBarUI();
@@ -94,7 +95,7 @@ async function startAutoAccept() {
     await buttonClicker.start();
     isEnabled = true;
     statusBarUI.setEnabled(true);
-    vscode.window.showInformationMessage('Antigravity Autorun: ON');
+    vscode.window.showInformationMessage('Antigravity Autorun: ON - CDP connected!');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     statusBarUI.setError(true);
