@@ -1,0 +1,99 @@
+{
+  "name": "antigravity-auto-accept",
+  "displayName": "Antigravity Auto Accept",
+  "description": "Automatically clicks Run/Accept/Accept All buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
+  "version": "1.2.0",
+  "publisher": "integralink",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Machine Learning"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "antigravity",
+    "auto-accept",
+    "automation",
+    "cdp"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "antigravity-auto-accept.toggle",
+        "title": "Antigravity Auto Accept: Toggle ON/OFF"
+      },
+      {
+        "command": "antigravity-auto-accept.reconnect",
+        "title": "Antigravity Auto Accept: Reconnect CDP"
+      },
+      {
+        "command": "antigravity-auto-accept.restartWithCDP",
+        "title": "Antigravity Auto Accept: Restart Antigravity with CDP"
+      }
+    ],
+    "configuration": {
+      "title": "Antigravity Auto Accept",
+      "properties": {
+        "antigravityAutoAccept.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable auto-accept on startup"
+        },
+        "antigravityAutoAccept.cdpPort": {
+          "type": "number",
+          "default": 9222,
+          "description": "CDP port (9222 or 9333)"
+        },
+        "antigravityAutoAccept.delay": {
+          "type": "number",
+          "default": 100,
+          "description": "Delay in ms before clicking (for throttling)"
+        },
+        "antigravityAutoAccept.autoScroll": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-scroll to hidden buttons"
+        },
+        "antigravityAutoAccept.blockedCommands": {
+          "type": "array",
+          "default": ["rm -rf /", "sudo rm", "format", "del /"],
+          "description": "Commands to never auto-accept"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/chrome-remote-interface": "^0.31.14",
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/integralink/antigravity-auto-accept"
+  },
+  "license": "MIT"
+}
