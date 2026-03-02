@@ -21,7 +21,10 @@ export class CDPConnection {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
 
-  constructor(port: number = 9222) {
+  // 시도할 포트 목록 (순서대로 시도)
+  private static readonly PORT_CANDIDATES = [9223, 9222, 9224, 9225];
+
+  constructor(port: number = 9223) {
     this.port = port;
   }
 
@@ -42,32 +45,54 @@ export class CDPConnection {
       return;
     }
 
-    try {
-      // Try to find Launchpad (Agent panel) - this is where Run/Accept buttons are
-      const targets = await CDP.List({ port: this.port });
+    // 현재 포트로 먼저 시도, 실패하면 다른 포트들 시도
+    const portsToTry = [this.port, ...CDPConnection.PORT_CANDIDATES.filter(p => p !== this.port)];
 
-      // Priority: Launchpad > jetski-agent > workbench
+    for (const port of portsToTry) {
+      try {
+        const connected = await this.tryConnectToPort(port);
+        if (connected) {
+          this.port = port;
+          return;
+        }
+      } catch {
+        console.log(`Port ${port} failed, trying next...`);
+      }
+    }
+
+    throw new Error(`Failed to connect to CDP on any port: ${portsToTry.join(', ')}`);
+  }
+
+  private async tryConnectToPort(port: number): Promise<boolean> {
+    try {
+      // Try to find Antigravity targets
+      const targets = await CDP.List({ port });
+
+      // Priority: workbench (main window where buttons are) > Launchpad > jetski-agent
+      const workbench = targets.find(
+        (t: any) => t.type === 'page' && t.title.includes('Antigravity') && t.url.includes('workbench.html')
+      );
       const launchpad = targets.find(
         (t: any) => t.type === 'page' && t.title === 'Launchpad'
       );
       const jetskiAgent = targets.find(
         (t: any) => t.type === 'page' && t.url.includes('jetski-agent')
       );
-      const workbench = targets.find(
-        (t: any) => t.type === 'page' && t.url.includes('workbench')
-      );
 
-      const antigravityTarget = launchpad || jetskiAgent || workbench;
-      console.log('Target found:', antigravityTarget?.title || 'default');
+      const antigravityTarget = workbench || launchpad || jetskiAgent;
+
+      if (!antigravityTarget) {
+        console.log(`Port ${port}: No Antigravity target found`);
+        return false;
+      }
+
+      console.log(`Port ${port}: Target found - ${antigravityTarget.title}`);
 
       const options: any = {
         host: 'localhost',
-        port: this.port,
+        port: port,
+        target: antigravityTarget,
       };
-
-      if (antigravityTarget) {
-        options.target = antigravityTarget;
-      }
 
       this.client = (await CDP(options)) as unknown as CDPClient;
 
@@ -78,11 +103,11 @@ export class CDPConnection {
 
       this.isConnected = true;
       this.reconnectAttempts = 0;
-      console.log(`CDP connected on port ${this.port}`);
+      console.log(`CDP connected on port ${port}`);
+      return true;
     } catch (error) {
-      this.isConnected = false;
-      this.client = null;
-      throw new Error(`Failed to connect to CDP on port ${this.port}: ${error}`);
+      console.log(`Port ${port}: Connection failed - ${error}`);
+      return false;
     }
   }
 

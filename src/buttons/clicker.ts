@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { CDPConnection } from '../cdp/connection';
+import { AutoClickSettings } from '../ui/statusBar';
 
 // Button selectors for Antigravity IDE
 const BUTTON_SELECTORS = [
@@ -30,6 +31,11 @@ export class ButtonClicker {
   private isRunning = false;
   private observerInjected = false;
   private pollInterval: NodeJS.Timeout | null = null;
+  private autoClickSettings: AutoClickSettings = {
+    runEnabled: true,
+    retryEnabled: true,
+    acceptEnabled: false,
+  };
 
   constructor(connection: CDPConnection, config: vscode.WorkspaceConfiguration) {
     this.connection = connection;
@@ -38,6 +44,15 @@ export class ButtonClicker {
 
   updateConfig(config: vscode.WorkspaceConfiguration): void {
     this.config = config;
+  }
+
+  updateAutoClickSettings(settings: AutoClickSettings): void {
+    this.autoClickSettings = settings;
+    // Re-inject observer with new settings
+    if (this.isRunning) {
+      this.observerInjected = false;
+      this.injectObserver().catch(console.error);
+    }
   }
 
   async start(): Promise<void> {
@@ -77,6 +92,7 @@ export class ButtonClicker {
     const delay = this.config.get<number>('delay', 100);
     const autoScroll = this.config.get<boolean>('autoScroll', true);
     const blockedCommands = this.config.get<string[]>('blockedCommands', []);
+    const { runEnabled, retryEnabled, acceptEnabled } = this.autoClickSettings;
 
     const script = `
       // Remove existing observer if any
@@ -89,19 +105,26 @@ export class ButtonClicker {
         delay: ${delay},
         autoScroll: ${autoScroll},
         blockedCommands: ${JSON.stringify(blockedCommands)},
+        runEnabled: ${runEnabled},
+        retryEnabled: ${retryEnabled},
+        acceptEnabled: ${acceptEnabled},
       };
 
-      // Button text patterns to match
-      const BUTTON_PATTERNS = [
-        /^run$/i,
-        /^accept$/i,
-        /^accept all$/i,
-        /^allow$/i,
-        /^confirm$/i,
-        /^continue$/i,
-        /^proceed$/i,
-        /^yes$/i,
-        /^ok$/i,
+      // Button text patterns to match (based on settings)
+      const BUTTON_PATTERNS = [];
+      if (CONFIG.runEnabled) {
+        BUTTON_PATTERNS.push(/^run(\\s|$)/i);
+      }
+      if (CONFIG.retryEnabled) {
+        BUTTON_PATTERNS.push(/^retry(\\s|$)/i);
+      }
+      if (CONFIG.acceptEnabled) {
+        BUTTON_PATTERNS.push(/^accept(\\s|$)/i);
+      }
+
+      // Patterns to exclude (settings buttons)
+      const EXCLUDE_PATTERNS = [
+        /^always run/i,
       ];
 
       // Check if command is blocked
@@ -135,6 +158,10 @@ export class ButtonClicker {
         // Check text matches
         const matchesPattern = BUTTON_PATTERNS.some(pattern => pattern.test(text));
         if (!matchesPattern) return false;
+
+        // Check excluded patterns (settings/deny buttons)
+        const isExcluded = EXCLUDE_PATTERNS.some(pattern => pattern.test(text));
+        if (isExcluded) return false;
 
         // Check not blocked
         if (isCommandBlocked(element)) {

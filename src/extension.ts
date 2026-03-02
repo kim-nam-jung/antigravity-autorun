@@ -28,7 +28,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Get configuration
   const config = vscode.workspace.getConfiguration('antigravityAutoAccept');
-  const cdpPort = config.get<number>('cdpPort', 9222);
+  const cdpPort = config.get<number>('cdpPort', 9223);
   const enabled = config.get<boolean>('enabled', true);
 
   // Initialize CDP connection
@@ -57,7 +57,25 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(toggleCommand, reconnectCommand, restartWithCDPCommand);
+  const showMenuCommand = vscode.commands.registerCommand(
+    'antigravity-auto-accept.showMenu',
+    async () => {
+      if (statusBarUI) {
+        await statusBarUI.showMenu();
+      }
+    }
+  );
+
+  context.subscriptions.push(toggleCommand, reconnectCommand, restartWithCDPCommand, showMenuCommand);
+
+  // Listen for settings changes from UI
+  if (statusBarUI) {
+    statusBarUI.setOnSettingsChanged((settings) => {
+      if (buttonClicker) {
+        buttonClicker.updateAutoClickSettings(settings);
+      }
+    });
+  }
 
   // Auto-start if enabled
   if (enabled) {
@@ -91,7 +109,7 @@ async function startAutoAccept() {
 
   try {
     await cdpConnection.connect();
-    buttonClicker.start();
+    await buttonClicker.start();
     isEnabled = true;
     statusBarUI.setEnabled(true);
     vscode.window.showInformationMessage('Antigravity Auto Accept: ON');
@@ -99,12 +117,12 @@ async function startAutoAccept() {
     const message = error instanceof Error ? error.message : 'Unknown error';
     statusBarUI.setError(true);
 
-    // CDP 연결 실패 시 재시작 여부 묻기
+    // Ask to restart with CDP if connection failed
     const config = vscode.workspace.getConfiguration('antigravityAutoAccept');
-    const cdpPort = config.get<number>('cdpPort', 9222);
+    const cdpPort = config.get<number>('cdpPort', 9223);
 
     const action = await vscode.window.showErrorMessage(
-      `CDP 연결 실패: Antigravity를 CDP 모드로 재시작할까요?`,
+      `CDP connection failed: Restart Antigravity with CDP mode?`,
       'Yes, Restart',
       'No'
     );
@@ -164,54 +182,61 @@ function handleConfigChange() {
   }
 }
 
-// Antigravity를 CDP 모드로 재시작
+// Restart Antigravity with CDP mode
 async function restartAntigravityWithCDP(port: number): Promise<void> {
   if (!statusBarUI) return;
 
   statusBarUI.setConnecting(true);
 
   try {
-    // 1. 현재 Antigravity 프로세스 종료
-    vscode.window.showInformationMessage('Antigravity를 재시작합니다...');
-
-    if (process.platform === 'win32') {
-      try {
-        await execAsync('taskkill /IM Antigravity.exe /F');
-      } catch {
-        // 이미 종료되어 있을 수 있음
-      }
-    }
-
-    // 2. 잠시 대기
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // 3. Antigravity 경로 찾기
-    let antigravityPath: string | null = null;
     const fs = require('fs');
+    const path = require('path');
 
-    for (const path of ANTIGRAVITY_PATHS) {
-      if (path && fs.existsSync(path)) {
-        antigravityPath = path;
+    // 1. Find Antigravity path
+    let antigravityPath: string | null = null;
+
+    for (const p of ANTIGRAVITY_PATHS) {
+      if (p && fs.existsSync(p)) {
+        antigravityPath = p;
         break;
       }
     }
 
     if (!antigravityPath) {
-      throw new Error('Antigravity 설치 경로를 찾을 수 없습니다.');
+      throw new Error('Antigravity installation path not found.');
     }
 
-    // 4. CDP 포트와 함께 재시작
-    const command = `start "" "${antigravityPath}" --remote-debugging-port=${port}`;
-    await execAsync(command, { shell: 'cmd.exe' });
+    // 2. Create batch file for restart
+    const tempDir = process.env.TEMP || 'C:\\Temp';
+    const batchPath = path.join(tempDir, 'restart-antigravity-cdp.bat');
 
-    // 5. Antigravity가 시작될 때까지 대기
-    vscode.window.showInformationMessage('Antigravity 시작 대기 중...');
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    const batchContent = `@echo off
+timeout /t 2 /nobreak > nul
+taskkill /IM Antigravity.exe /F 2>nul
+timeout /t 2 /nobreak > nul
+start "" "${antigravityPath}" --remote-debugging-port=${port}
+del "%~f0"
+`;
 
-    // 6. CDP 연결 재시도
+    fs.writeFileSync(batchPath, batchContent);
+
+    // 3. Run batch file (detached - runs independently of Antigravity)
+    const { spawn } = require('child_process');
+    spawn('cmd.exe', ['/c', batchPath], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true
+    }).unref();
+
+    vscode.window.showInformationMessage('Restarting Antigravity with CDP mode. Please wait...');
+
+    // 4. Wait for Antigravity to restart
+    await new Promise(resolve => setTimeout(resolve, 8000));
+
+    // 5. Retry CDP connection
     if (cdpConnection) {
       let connected = false;
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 15; i++) {
         try {
           await cdpConnection.connect();
           connected = true;
@@ -222,19 +247,19 @@ async function restartAntigravityWithCDP(port: number): Promise<void> {
       }
 
       if (connected && buttonClicker) {
-        buttonClicker.start();
+        await buttonClicker.start();
         isEnabled = true;
         statusBarUI.setEnabled(true);
-        vscode.window.showInformationMessage('Antigravity Auto Accept: ON (CDP 모드로 재시작됨)');
+        vscode.window.showInformationMessage('Antigravity Auto Accept: ON (Restarted with CDP)');
       } else {
-        throw new Error('CDP 연결 실패');
+        throw new Error('CDP connection failed - Check if Antigravity started with CDP mode');
       }
     }
   } catch (error) {
     statusBarUI.setConnecting(false);
     statusBarUI.setError(true);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    vscode.window.showErrorMessage(`재시작 실패: ${message}`);
+    vscode.window.showErrorMessage(`Restart failed: ${message}`);
   }
 }
 
