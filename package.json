@@ -2,8 +2,9 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Automatically clicks Run/Accept/Accept All buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "2.6.1",
-  "publisher": "njk",
+  "version": "2.6.5",
+  "publisher": "kim-nam-jung",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -17,7 +18,7 @@
   },
   "keywords": [
     "antigravity",
-    "auto-accept",
+    "autorun",
     "automation",
     "cdp"
   ],
@@ -28,49 +29,49 @@
   "contributes": {
     "commands": [
       {
-        "command": "antigravity-auto-accept.showMenu",
-        "title": "Antigravity Auto Accept: Settings"
+        "command": "antigravity-autorun.showMenu",
+        "title": "Antigravity Autorun: Settings"
       },
       {
-        "command": "antigravity-auto-accept.toggle",
-        "title": "Antigravity Auto Accept: Toggle ON/OFF"
+        "command": "antigravity-autorun.toggle",
+        "title": "Antigravity Autorun: Toggle ON/OFF"
       },
       {
-        "command": "antigravity-auto-accept.reconnect",
-        "title": "Antigravity Auto Accept: Reconnect CDP"
+        "command": "antigravity-autorun.reconnect",
+        "title": "Antigravity Autorun: Reconnect CDP"
       },
       {
-        "command": "antigravity-auto-accept.restartWithCDP",
-        "title": "Antigravity Auto Accept: Restart Antigravity with CDP"
+        "command": "antigravity-autorun.restartWithCDP",
+        "title": "Antigravity Autorun: Restart Antigravity with CDP"
       }
     ],
     "configuration": {
-      "title": "Antigravity Auto Accept",
+      "title": "Antigravity Autorun",
       "properties": {
-        "antigravityAutoAccept.enabled": {
+        "antigravityAutorun.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable auto-accept on startup"
+          "description": "Enable autorun on startup"
         },
-        "antigravityAutoAccept.cdpPort": {
+        "antigravityAutorun.cdpPort": {
           "type": "number",
           "default": 9222,
           "description": "CDP port (9222 or 9333)"
         },
-        "antigravityAutoAccept.delay": {
+        "antigravityAutorun.delay": {
           "type": "number",
           "default": 100,
           "description": "Delay in ms before clicking (for throttling)"
         },
-        "antigravityAutoAccept.autoScroll": {
+        "antigravityAutorun.autoScroll": {
           "type": "boolean",
           "default": true,
           "description": "Auto-scroll to hidden buttons"
         },
-        "antigravityAutoAccept.blockedCommands": {
+        "antigravityAutorun.blockedCommands": {
           "type": "array",
           "default": ["rm -rf /", "sudo rm", "format", "del /"],
-          "description": "Commands to never auto-accept"
+          "description": "Commands to never autorun"
         }
       }
     }
@@ -97,7 +98,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/integralink/antigravity-auto-accept"
+    "url": "https://github.com/integralink/antigravity-autorun"
   },
   "license": "MIT"
 }

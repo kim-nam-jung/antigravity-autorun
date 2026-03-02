@@ -23,8 +23,8 @@ export class StatusBarUI implements vscode.Disposable {
       vscode.StatusBarAlignment.Right,
       100
     );
-    this.statusBarItem.command = 'antigravity-auto-accept.showMenu';
-    this.statusBarItem.tooltip = 'Click to open Auto Accept settings';
+    this.statusBarItem.command = 'antigravity-autorun.showMenu';
+    this.statusBarItem.tooltip = 'Click to open Autorun settings';
     this.updateDisplay();
     this.statusBarItem.show();
   }
@@ -35,6 +35,13 @@ export class StatusBarUI implements vscode.Disposable {
 
   getSettings(): AutoClickSettings {
     return { ...this.settings };
+  }
+
+  // Allow extension.ts to update settings when toggling globally
+  updateSettingsFromToggle(settings: AutoClickSettings): void {
+    this.settings = settings;
+    this.notifySettingsChanged();
+    this.updateDisplay();
   }
 
   async showMenu(): Promise<void> {
@@ -54,7 +61,7 @@ export class StatusBarUI implements vscode.Disposable {
           description: this.settings.retryEnabled ? 'ON' : 'OFF',
         },
         {
-          label: `${acceptIcon} Accept Button`,
+          label: `${acceptIcon} Accept/Allow Buttons`,
           description: this.settings.acceptEnabled ? 'ON' : 'OFF',
         },
       ];
@@ -129,6 +136,7 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.tooltip =
         'Click to open settings';
     } else {
+      // isEnabled===false OR anyEnabled===false (모든 항목이 꺼져있는 경우)
       this.statusBarItem.text = '$(circle-slash) Auto: OFF';
       this.statusBarItem.backgroundColor = undefined;
       this.statusBarItem.color = new vscode.ThemeColor(

@@ -96,8 +96,8 @@ export class ButtonClicker {
 
     const script = `
       // Remove existing observer if any
-      if (window.__antigravityAutoAcceptObserver) {
-        window.__antigravityAutoAcceptObserver.disconnect();
+      if (window.__antigravityAutorunObserver) {
+        window.__antigravityAutorunObserver.disconnect();
       }
 
       // Configuration
@@ -111,15 +111,20 @@ export class ButtonClicker {
       };
 
       // Button text patterns to match (based on settings)
+      // Use case-insensitive search anywhere in the button text to handle icons
       const BUTTON_PATTERNS = [];
       if (CONFIG.runEnabled) {
-        BUTTON_PATTERNS.push(/^run(\\s|$)/i);
+        BUTTON_PATTERNS.push(/\\brun\\b/i);
       }
       if (CONFIG.retryEnabled) {
-        BUTTON_PATTERNS.push(/^retry(\\s|$)/i);
+        BUTTON_PATTERNS.push(/\\bretry\\b/i);
       }
       if (CONFIG.acceptEnabled) {
-        BUTTON_PATTERNS.push(/^accept(\\s|$)/i);
+        BUTTON_PATTERNS.push(/\\baccept(\\s|$|\\b)/i);
+        BUTTON_PATTERNS.push(/\\bconfirm\\b/i);
+        BUTTON_PATTERNS.push(/\\ballow\\b/i);
+        BUTTON_PATTERNS.push(/\\ballow once\\b/i);
+        BUTTON_PATTERNS.push(/\\ballow this conversation\\b/i);
       }
 
       // Patterns to exclude (settings buttons)
@@ -129,7 +134,8 @@ export class ButtonClicker {
 
       // Check if command is blocked
       function isCommandBlocked(element) {
-        const parent = element.closest('[class*="terminal"], [class*="command"], [class*="prompt"]');
+        // Only check immediate command container, not the whole terminal
+        const parent = element.closest('[class*="command-body"], [class*="prompt"]');
         if (!parent) return false;
 
         const commandText = parent.textContent || '';
@@ -165,7 +171,7 @@ export class ButtonClicker {
 
         // Check not blocked
         if (isCommandBlocked(element)) {
-          console.log('[AutoAccept] Blocked command detected, skipping');
+          console.log('[Autorun] Blocked command detected, skipping');
           return false;
         }
 
@@ -186,7 +192,7 @@ export class ButtonClicker {
             cancelable: true,
             view: window,
           }));
-          console.log('[AutoAccept] Clicked:', button.textContent?.trim());
+          console.log('[Autorun] Clicked:', button.textContent?.trim());
         }, CONFIG.delay);
       }
 
@@ -210,7 +216,7 @@ export class ButtonClicker {
       }
 
       // Create MutationObserver
-      window.__antigravityAutoAcceptObserver = new MutationObserver((mutations) => {
+      window.__antigravityAutorunObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
           // Check added nodes
           for (const node of mutation.addedNodes) {
@@ -235,7 +241,7 @@ export class ButtonClicker {
       });
 
       // Start observing
-      window.__antigravityAutoAcceptObserver.observe(document.body, {
+      window.__antigravityAutorunObserver.observe(document.body, {
         childList: true,
         subtree: true,
       });
@@ -243,7 +249,7 @@ export class ButtonClicker {
       // Initial scan
       scanForButtons();
 
-      console.log('[AutoAccept] Observer injected and active');
+      console.log('[Autorun] Observer injected and active');
     `;
 
     await this.connection.injectScript(script);
@@ -252,10 +258,10 @@ export class ButtonClicker {
 
   private async removeObserver(): Promise<void> {
     const script = `
-      if (window.__antigravityAutoAcceptObserver) {
-        window.__antigravityAutoAcceptObserver.disconnect();
-        window.__antigravityAutoAcceptObserver = null;
-        console.log('[AutoAccept] Observer removed');
+      if (window.__antigravityAutorunObserver) {
+        window.__antigravityAutorunObserver.disconnect();
+        window.__antigravityAutorunObserver = null;
+        console.log('[Autorun] Observer removed');
       }
     `;
 

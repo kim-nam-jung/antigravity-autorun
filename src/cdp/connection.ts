@@ -78,8 +78,12 @@ export class CDPConnection {
       const jetskiAgent = targets.find(
         (t: any) => t.type === 'page' && t.url.includes('jetski-agent')
       );
+      // Fallback: any VS Code/Antigravity page
+      const anyPage = targets.find(
+        (t: any) => t.type === 'page'
+      );
 
-      const antigravityTarget = workbench || launchpad || jetskiAgent;
+      const antigravityTarget = workbench || launchpad || jetskiAgent || anyPage;
 
       if (!antigravityTarget) {
         console.log(`Port ${port}: No Antigravity target found`);

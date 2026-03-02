@@ -20,14 +20,14 @@ const ANTIGRAVITY_PATHS = [
 ];
 
 export async function activate(context: vscode.ExtensionContext) {
-  console.log('Antigravity Auto Accept is activating...');
+  console.log('Antigravity Autorun is activating...');
 
   // Initialize UI
   statusBarUI = new StatusBarUI();
   context.subscriptions.push(statusBarUI);
 
   // Get configuration
-  const config = vscode.workspace.getConfiguration('antigravityAutoAccept');
+  const config = vscode.workspace.getConfiguration('antigravityAutorun');
   const cdpPort = config.get<number>('cdpPort', 9223);
   const enabled = config.get<boolean>('enabled', true);
 
@@ -37,28 +37,28 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register commands
   const toggleCommand = vscode.commands.registerCommand(
-    'antigravity-auto-accept.toggle',
+    'antigravity-autorun.toggle',
     async () => {
       await toggleAutoAccept();
     }
   );
 
   const reconnectCommand = vscode.commands.registerCommand(
-    'antigravity-auto-accept.reconnect',
+    'antigravity-autorun.reconnect',
     async () => {
       await reconnectCDP();
     }
   );
 
   const restartWithCDPCommand = vscode.commands.registerCommand(
-    'antigravity-auto-accept.restartWithCDP',
+    'antigravity-autorun.restartWithCDP',
     async () => {
       await restartAntigravityWithCDP(cdpPort);
     }
   );
 
   const showMenuCommand = vscode.commands.registerCommand(
-    'antigravity-auto-accept.showMenu',
+    'antigravity-autorun.showMenu',
     async () => {
       if (statusBarUI) {
         await statusBarUI.showMenu();
@@ -85,19 +85,28 @@ export async function activate(context: vscode.ExtensionContext) {
   // Listen for configuration changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('antigravityAutoAccept')) {
+      if (e.affectsConfiguration('antigravityAutorun')) {
         handleConfigChange();
       }
     })
   );
 
-  console.log('Antigravity Auto Accept activated!');
+  console.log('Antigravity Autorun activated!');
 }
 
 async function toggleAutoAccept() {
   if (isEnabled) {
     await stopAutoAccept();
   } else {
+    // If all individual options are off, enable them by default when toggling ON
+    if (statusBarUI) {
+      const settings = statusBarUI.getSettings();
+      if (!settings.runEnabled && !settings.retryEnabled && !settings.acceptEnabled) {
+        settings.runEnabled = true;
+        settings.retryEnabled = true;
+        statusBarUI.updateSettingsFromToggle(settings);
+      }
+    }
     await startAutoAccept();
   }
 }
@@ -112,13 +121,13 @@ async function startAutoAccept() {
     await buttonClicker.start();
     isEnabled = true;
     statusBarUI.setEnabled(true);
-    vscode.window.showInformationMessage('Antigravity Auto Accept: ON');
+    vscode.window.showInformationMessage('Antigravity Autorun: ON');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     statusBarUI.setError(true);
 
     // Ask to restart with CDP if connection failed
-    const config = vscode.workspace.getConfiguration('antigravityAutoAccept');
+    const config = vscode.workspace.getConfiguration('antigravityAutorun');
     const cdpPort = config.get<number>('cdpPort', 9223);
 
     const action = await vscode.window.showErrorMessage(
@@ -141,7 +150,7 @@ async function stopAutoAccept() {
   buttonClicker.stop();
   isEnabled = false;
   statusBarUI.setEnabled(false);
-  vscode.window.showInformationMessage('Antigravity Auto Accept: OFF');
+  vscode.window.showInformationMessage('Antigravity Autorun: OFF');
 }
 
 async function reconnectCDP() {
@@ -166,7 +175,7 @@ async function reconnectCDP() {
 }
 
 function handleConfigChange() {
-  const config = vscode.workspace.getConfiguration('antigravityAutoAccept');
+  const config = vscode.workspace.getConfiguration('antigravityAutorun');
 
   if (buttonClicker) {
     buttonClicker.updateConfig(config);
@@ -250,7 +259,7 @@ del "%~f0"
         await buttonClicker.start();
         isEnabled = true;
         statusBarUI.setEnabled(true);
-        vscode.window.showInformationMessage('Antigravity Auto Accept: ON (Restarted with CDP)');
+        vscode.window.showInformationMessage('Antigravity Autorun: ON (Restarted with CDP)');
       } else {
         throw new Error('CDP connection failed - Check if Antigravity started with CDP mode');
       }
@@ -270,5 +279,5 @@ export function deactivate() {
   if (cdpConnection) {
     cdpConnection.disconnect();
   }
-  console.log('Antigravity Auto Accept deactivated');
+  console.log('Antigravity Autorun deactivated');
 }
