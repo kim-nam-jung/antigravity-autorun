@@ -2,8 +2,8 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Automatically clicks Run/Accept/Accept All buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "2.6.5",
-  "publisher": "kim-nam-jung",
+  "version": "1.0.0",
+  "publisher": "njk",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
@@ -18,20 +18,22 @@
   },
   "keywords": [
     "antigravity",
+    "Antigravity",
     "autorun",
     "automation",
-    "cdp"
+    "auto-accept",
+    "auto-click",
+    "cdp",
+    "agent",
+    "ai"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-      {
-        "command": "antigravity-autorun.showMenu",
-        "title": "Antigravity Autorun: Settings"
-      },
+
       {
         "command": "antigravity-autorun.toggle",
         "title": "Antigravity Autorun: Toggle ON/OFF"

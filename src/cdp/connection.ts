@@ -65,8 +65,11 @@ export class CDPConnection {
 
   private async tryConnectToPort(port: number): Promise<boolean> {
     try {
-      // Try to find Antigravity targets
-      const targets = await CDP.List({ port });
+      // Try to find Antigravity targets (with 3s timeout)
+      const targets = await Promise.race([
+        CDP.List({ port }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+      ]);
 
       // Priority: workbench (main window where buttons are) > Launchpad > jetski-agent
       const workbench = targets.find(

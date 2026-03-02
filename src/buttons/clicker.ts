@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { CDPConnection } from '../cdp/connection';
-import { AutoClickSettings } from '../ui/statusBar';
 
 // Button selectors for Antigravity IDE
 const BUTTON_SELECTORS = [
@@ -31,12 +30,6 @@ export class ButtonClicker {
   private isRunning = false;
   private observerInjected = false;
   private pollInterval: NodeJS.Timeout | null = null;
-  private autoClickSettings: AutoClickSettings = {
-    runEnabled: true,
-    retryEnabled: true,
-    acceptEnabled: false,
-  };
-
   constructor(connection: CDPConnection, config: vscode.WorkspaceConfiguration) {
     this.connection = connection;
     this.config = config;
@@ -45,16 +38,6 @@ export class ButtonClicker {
   updateConfig(config: vscode.WorkspaceConfiguration): void {
     this.config = config;
   }
-
-  updateAutoClickSettings(settings: AutoClickSettings): void {
-    this.autoClickSettings = settings;
-    // Re-inject observer with new settings
-    if (this.isRunning) {
-      this.observerInjected = false;
-      this.injectObserver().catch(console.error);
-    }
-  }
-
   async start(): Promise<void> {
     if (this.isRunning) {
       return;
@@ -92,7 +75,6 @@ export class ButtonClicker {
     const delay = this.config.get<number>('delay', 100);
     const autoScroll = this.config.get<boolean>('autoScroll', true);
     const blockedCommands = this.config.get<string[]>('blockedCommands', []);
-    const { runEnabled, retryEnabled, acceptEnabled } = this.autoClickSettings;
 
     const script = `
       // Remove existing observer if any
@@ -105,31 +87,27 @@ export class ButtonClicker {
         delay: ${delay},
         autoScroll: ${autoScroll},
         blockedCommands: ${JSON.stringify(blockedCommands)},
-        runEnabled: ${runEnabled},
-        retryEnabled: ${retryEnabled},
-        acceptEnabled: ${acceptEnabled},
       };
 
-      // Button text patterns to match (based on settings)
+      // Button text patterns to match
       // Use case-insensitive search anywhere in the button text to handle icons
-      const BUTTON_PATTERNS = [];
-      if (CONFIG.runEnabled) {
-        BUTTON_PATTERNS.push(/\\brun\\b/i);
-      }
-      if (CONFIG.retryEnabled) {
-        BUTTON_PATTERNS.push(/\\bretry\\b/i);
-      }
-      if (CONFIG.acceptEnabled) {
-        BUTTON_PATTERNS.push(/\\baccept(\\s|$|\\b)/i);
-        BUTTON_PATTERNS.push(/\\bconfirm\\b/i);
-        BUTTON_PATTERNS.push(/\\ballow\\b/i);
-        BUTTON_PATTERNS.push(/\\ballow once\\b/i);
-        BUTTON_PATTERNS.push(/\\ballow this conversation\\b/i);
-      }
+      const BUTTON_PATTERNS = [
+        /\\brun\\b/i,
+        /\\bretry\\b/i,
+        /\\baccept(\\s|$|\\b)/i,
+        /\\bconfirm\\b/i,
+        /\\ballow\\b/i,
+        /\\ballow once\\b/i,
+        /\\ballow this conversation\\b/i,
+      ];
 
       // Patterns to exclude (settings buttons)
       const EXCLUDE_PATTERNS = [
         /^always run/i,
+        /run button/i,
+        /retry button/i,
+        /accept\/allow/i,
+        /auto click settings/i,
       ];
 
       // Check if command is blocked

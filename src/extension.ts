@@ -57,29 +57,11 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  const showMenuCommand = vscode.commands.registerCommand(
-    'antigravity-autorun.showMenu',
-    async () => {
-      if (statusBarUI) {
-        await statusBarUI.showMenu();
-      }
-    }
-  );
+  context.subscriptions.push(toggleCommand, reconnectCommand, restartWithCDPCommand);
 
-  context.subscriptions.push(toggleCommand, reconnectCommand, restartWithCDPCommand, showMenuCommand);
-
-  // Listen for settings changes from UI
-  if (statusBarUI) {
-    statusBarUI.setOnSettingsChanged((settings) => {
-      if (buttonClicker) {
-        buttonClicker.updateAutoClickSettings(settings);
-      }
-    });
-  }
-
-  // Auto-start if enabled
+  // Auto-start if enabled (non-blocking so activate completes immediately)
   if (enabled) {
-    await startAutoAccept();
+    startAutoAccept().catch(console.error);
   }
 
   // Listen for configuration changes
@@ -98,15 +80,6 @@ async function toggleAutoAccept() {
   if (isEnabled) {
     await stopAutoAccept();
   } else {
-    // If all individual options are off, enable them by default when toggling ON
-    if (statusBarUI) {
-      const settings = statusBarUI.getSettings();
-      if (!settings.runEnabled && !settings.retryEnabled && !settings.acceptEnabled) {
-        settings.runEnabled = true;
-        settings.retryEnabled = true;
-        statusBarUI.updateSettingsFromToggle(settings);
-      }
-    }
     await startAutoAccept();
   }
 }
@@ -130,15 +103,15 @@ async function startAutoAccept() {
     const config = vscode.workspace.getConfiguration('antigravityAutorun');
     const cdpPort = config.get<number>('cdpPort', 9223);
 
-    const action = await vscode.window.showErrorMessage(
+    vscode.window.showErrorMessage(
       `CDP connection failed: Restart Antigravity with CDP mode?`,
       'Yes, Restart',
       'No'
-    );
-
-    if (action === 'Yes, Restart') {
-      await restartAntigravityWithCDP(cdpPort);
-    }
+    ).then(action => {
+      if (action === 'Yes, Restart') {
+        restartAntigravityWithCDP(cdpPort);
+      }
+    });
   }
 }
 
