@@ -11,7 +11,7 @@ export class StatusBarUI implements vscode.Disposable {
       vscode.StatusBarAlignment.Right,
       100
     );
-    this.statusBarItem.command = 'antigravity-auto-accept.toggle';
+    this.statusBarItem.command = 'antigravity-autorun.toggle';
     this.statusBarItem.tooltip = 'Click to toggle Antigravity Auto Accept';
     this.updateDisplay();
     this.statusBarItem.show();

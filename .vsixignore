@@ -1,0 +1,12 @@
+.env
+.env.*
+*.vsix
+.vscode/**
+.gitignore
+.gitattributes
+**/*.map
+**/tsconfig.json
+**/eslint*
+**/.eslintrc*
+node_modules/**
+src/**

@@ -1,28 +1,7 @@
 import * as vscode from 'vscode';
 import { CDPConnection } from '../cdp/connection';
 
-// Button selectors for Antigravity IDE
-const BUTTON_SELECTORS = [
-  // Run buttons
-  'button[data-testid*="run"]',
-  'button:has-text("Run")',
-
-  // Accept buttons
-  'button[data-testid*="accept"]',
-  'button:has-text("Accept")',
-  'button:has-text("Accept All")',
-
-  // Allow/Confirm buttons
-  'button:has-text("Allow")',
-  'button:has-text("Confirm")',
-  'button:has-text("Continue")',
-  'button:has-text("Proceed")',
-
-  // Generic styled buttons (React components)
-  'span[class*="cursor-pointer"]:has-text("Accept")',
-  'div[role="button"]:has-text("Accept")',
-  'div[role="button"]:has-text("Run")',
-];
+// Removed unused BUTTON_SELECTORS
 
 export class ButtonClicker {
   private connection: CDPConnection;

@@ -1,4 +1,5 @@
 import CDP from 'chrome-remote-interface';
+import { isWSL, getWindowsHost } from '../utils/os';
 
 export interface CDPClient {
   Runtime: {
@@ -44,7 +45,8 @@ export class CDPConnection {
 
     try {
       // Try to find Launchpad (Agent panel) - this is where Run/Accept buttons are
-      const targets = await CDP.List({ port: this.port });
+      const host = isWSL() ? getWindowsHost() : 'localhost';
+      const targets = await CDP.List({ host, port: this.port });
 
       // Priority: Launchpad > jetski-agent > workbench
       const launchpad = targets.find(
@@ -61,7 +63,7 @@ export class CDPConnection {
       console.log('Target found:', antigravityTarget?.title || 'default');
 
       const options: any = {
-        host: 'localhost',
+        host,
         port: this.port,
       };
 
