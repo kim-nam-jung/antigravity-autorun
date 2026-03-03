@@ -1,162 +1,163 @@
 import * as vscode from 'vscode';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { CDPConnection } from './cdp/connection';
-import { NetworkAutoAccept } from './autorun/networkAutoAccept';
+import { CDPConnection, setCDPLogger } from './cdp/connection';
+import { ButtonClicker } from './buttons/clicker';
 import { StatusBarUI } from './ui/statusBar';
-import { findAntigravityPath } from './launcher/pathFinder';
-import { isWSL } from './utils/os';
+import CDP from 'chrome-remote-interface';
 
 let cdpConnection: CDPConnection | null = null;
-let networkAutoAccept: NetworkAutoAccept | null = null;
+let buttonClicker: ButtonClicker | null = null;
 let statusBarUI: StatusBarUI | null = null;
+let outputChannel: vscode.OutputChannel;
 let isEnabled = false;
 
-export async function activate(context: vscode.ExtensionContext) {
-  console.log('Antigravity Autorun is activating...');
+function log(msg: string) {
+  const ts = new Date().toLocaleTimeString();
+  outputChannel.appendLine(`[${ts}] ${msg}`);
+  console.log(msg);
+}
 
-  // Initialize UI
+export async function activate(context: vscode.ExtensionContext) {
+  outputChannel = vscode.window.createOutputChannel('Antigravity Autorun');
+  context.subscriptions.push(outputChannel);
+  outputChannel.show(true);
+  setCDPLogger((msg) => log(msg));
+
+  log('Antigravity Autorun activating...');
+
   statusBarUI = new StatusBarUI();
   context.subscriptions.push(statusBarUI);
 
-  // Get configuration
   const config = vscode.workspace.getConfiguration('antigravityAutorun');
   const cdpPort = config.get<number>('cdpPort', 9222);
   const enabled = config.get<boolean>('enabled', true);
 
-  // Initialize CDP connection
+  log(`Config: cdpPort=${cdpPort}, enabled=${enabled}`);
+
   cdpConnection = new CDPConnection(cdpPort);
-  networkAutoAccept = new NetworkAutoAccept(cdpConnection, config);
+  buttonClicker = new ButtonClicker(cdpConnection, config);
 
-  // Setup disconnect listener
-  cdpConnection.onDisconnect = () => {
-    if (isEnabled) {
-      vscode.window.showWarningMessage('CDP 연결이 예기치 않게 끊어졌습니다.');
-      stopAutoAccept();
-    }
-  };
-
-  // Register commands
-  const toggleCommand = vscode.commands.registerCommand(
-    'antigravity-autorun.toggle',
-    async () => {
-      await toggleAutoAccept();
-    }
-  );
-
-  const reconnectCommand = vscode.commands.registerCommand(
-    'antigravity-autorun.reconnect',
-    async () => {
-      await reconnectCDP();
-    }
-  );
-
-  context.subscriptions.push(toggleCommand, reconnectCommand);
-
-  // Auto-start if enabled
-  if (enabled) {
-    await startAutoAccept();
-  }
-
-  // Listen for configuration changes
   context.subscriptions.push(
+    vscode.commands.registerCommand('antigravity-autorun.toggle', () => toggleAutorun()),
+    vscode.commands.registerCommand('antigravity-autorun.reconnect', () => reconnectCDP()),
+    vscode.commands.registerCommand('antigravity-autorun.diagnose', () => diagnoseCDP()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('antigravityAutorun')) {
         handleConfigChange();
       }
-    })
+    }),
   );
 
-  console.log('Antigravity Autorun activated!');
+  if (enabled) {
+    statusBarUI.setConnecting(true);
+    startAutorun().catch(console.error);
+  }
+
+  log('Antigravity Autorun activated!');
 }
 
-async function toggleAutoAccept() {
+async function diagnoseCDP() {
+  outputChannel.show(true);
+  log('=== CDP Diagnosis ===');
+  const ports = [9222, 9223, 9224, 9225, 9229, 9333];
+  for (const port of ports) {
+    try {
+      const targets = await Promise.race([
+        CDP.List({ port }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+      ]);
+      log(`Port ${port}: ${(targets as any[]).length} targets found`);
+      (targets as any[]).forEach((t: any) => {
+        log(`  → [${t.type}] "${t.title}" | ${t.url}`);
+      });
+    } catch {
+      log(`Port ${port}: not available`);
+    }
+  }
+  log('=== End Diagnosis ===');
+}
+
+async function toggleAutorun() {
   if (isEnabled) {
-    await stopAutoAccept();
+    await stopAutorun();
   } else {
-    await startAutoAccept();
+    await startAutorun();
   }
 }
 
-async function startAutoAccept() {
-  if (!cdpConnection || !networkAutoAccept || !statusBarUI) {
-    return;
-  }
+async function startAutorun() {
+  if (!cdpConnection || !buttonClicker || !statusBarUI) return;
 
   try {
+    statusBarUI.setConnecting(true);
     await cdpConnection.connect();
-    await networkAutoAccept.start();
+    await buttonClicker.start();
     isEnabled = true;
     statusBarUI.setEnabled(true);
-    vscode.window.showInformationMessage('Antigravity Autorun: ON (CDP)');
+    log(`[Autorun] ON — connected to CDP port ${cdpConnection.getPort()}`);
   } catch (error) {
     isEnabled = false;
+    statusBarUI.setEnabled(false);
     statusBarUI.setError(true);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    vscode.window.showErrorMessage(`CDP connection failed: ${message}`);
+    log(`[Autorun] Failed to start: ${message}`);
+    vscode.window.showErrorMessage(
+      `CDP connection failed: ${message}. Antigravity가 실행 중인지 확인하세요.`
+    );
   }
 }
 
-async function stopAutoAccept() {
-  if (!networkAutoAccept || !statusBarUI) {
-    return;
-  }
-
-  await networkAutoAccept.stop();
+async function stopAutorun() {
+  if (!buttonClicker || !statusBarUI) return;
   isEnabled = false;
+  await buttonClicker.stop();
+  await cdpConnection?.disconnect();
   statusBarUI.setEnabled(false);
+  log('[Autorun] OFF');
   vscode.window.showInformationMessage('Antigravity Autorun: OFF');
 }
 
 async function reconnectCDP() {
-  if (!cdpConnection || !statusBarUI) {
-    return;
-  }
-
+  if (!cdpConnection || !buttonClicker || !statusBarUI) return;
   statusBarUI.setConnecting(true);
-
+  log('[Reconnect] Manual reconnect triggered');
   try {
     await cdpConnection.disconnect();
     await cdpConnection.connect();
+    await buttonClicker.restart();
+    isEnabled = true;
     statusBarUI.setConnecting(false);
-    statusBarUI.setEnabled(isEnabled);
-    vscode.window.showInformationMessage('CDP reconnected successfully');
+    statusBarUI.setEnabled(true);
+    log('[Reconnect] Manual reconnect success');
+    vscode.window.showInformationMessage('CDP reconnected');
   } catch (error) {
     statusBarUI.setConnecting(false);
     statusBarUI.setError(true);
+    isEnabled = false;
     const message = error instanceof Error ? error.message : 'Unknown error';
+    log(`[Reconnect] Manual reconnect failed: ${message}`);
     vscode.window.showErrorMessage(`CDP reconnection failed: ${message}`);
   }
 }
 
 function handleConfigChange() {
   const config = vscode.workspace.getConfiguration('antigravityAutorun');
-
-  if (networkAutoAccept) {
-    networkAutoAccept.updateConfig(config);
-  }
-
-  // Check if port changed
+  buttonClicker?.updateConfig(config);
   const newPort = config.get<number>('cdpPort', 9222);
   if (cdpConnection && cdpConnection.getPort() !== newPort) {
     cdpConnection.setPort(newPort);
     if (isEnabled) {
-      reconnectCDP();
+      reconnectCDP().catch(console.error);
     }
   }
 }
 
-
-
 export async function deactivate() {
-  if (networkAutoAccept) {
-    await networkAutoAccept.stop();
+  isEnabled = false;
+  try {
+    if (buttonClicker) await buttonClicker.stop();
+    if (cdpConnection) await cdpConnection.disconnect();
+  } catch (error) {
+    console.error('Error during deactivation:', error);
   }
-  if (cdpConnection) {
-    await cdpConnection.disconnect();
-  }
-  console.log('Antigravity Autorun deactivated');
+  log('Antigravity Autorun deactivated');
 }

@@ -1,9 +1,10 @@
 {
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
-  "description": "True hands-free automation for Antigravity Agent using lightning-fast CDP Network sniffing and Direct API interactions.",
+  "description": "Automatically clicks Run/Accept/Allow buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
   "version": "3.0.0",
   "publisher": "njk",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -17,9 +18,14 @@
   },
   "keywords": [
     "antigravity",
+    "Antigravity",
     "autorun",
     "automation",
-    "cdp"
+    "auto-accept",
+    "auto-click",
+    "cdp",
+    "agent",
+    "ai"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -36,12 +42,8 @@
         "title": "Antigravity Autorun: Reconnect CDP"
       },
       {
-        "command": "antigravity-autorun.restartWithCDP",
-        "title": "Antigravity Autorun: Restart Antigravity with CDP"
-      },
-      {
         "command": "antigravity-autorun.diagnose",
-        "title": "Antigravity Autorun: Diagnose CDP Connection"
+        "title": "Antigravity Autorun: Diagnose CDP Targets (Debug)"
       }
     ],
     "configuration": {
@@ -51,11 +53,6 @@
           "type": "boolean",
           "default": true,
           "description": "Enable autorun on startup"
-        },
-        "antigravityAutorun.antigravityPath": {
-          "type": "string",
-          "default": "",
-          "description": "Full path to Antigravity executable. Leave blank for auto-detection."
         },
         "antigravityAutorun.cdpPort": {
           "type": "number",
@@ -110,7 +107,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/integralink/antigravity-autorun"
+    "url": "https://github.com/kim-nam-jung/antigravity-autorun"
   },
   "license": "MIT"
 }

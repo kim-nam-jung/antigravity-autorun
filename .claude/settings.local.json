@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_navigate",
+      "Read(//mnt/c/Windows/Temp/**)",
+      "Bash(cmd.exe /c \"if exist \"\"%TEMP%\\\\restart-antigravity-cdp.bat\"\" \\(type \"\"%TEMP%\\\\restart-antigravity-cdp.bat\"\"\\) else \\(echo BAT NOT FOUND\\)\")",
+      "Bash(cmd.exe /c \"type \"\"%TEMP%\\\\ag_restart_log.txt\"\" 2>&1\")"
+    ],
+    "additionalDirectories": [
+      "\\home\\skawn1057\\Development\\antigravity-autorun\\src",
+      "\\\\wsl.localhost\\Ubuntu-24.04\\home\\skawn1057\\Development\\antigravity-autorun\\src"
+    ]
+  }
+}

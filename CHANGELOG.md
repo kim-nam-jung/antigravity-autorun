@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.6.20] - 2026-03-03
+
+### Fixed
+- Fixed an issue where concurrent Run/Accept buttons were dropped due to throttle.
+- Added queue system to sequentially click all valid buttons.
+- Skipped disabled, hidden, or zero-width buttons accurately.
+- Improved icon-only button detection explicitly using `aria-label` and `title`.
+
 ## [1.2.0] - 2026-03-02
 
 ### Fixed
