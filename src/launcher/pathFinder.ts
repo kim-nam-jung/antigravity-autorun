@@ -53,8 +53,8 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
             const localAppData = stdout.trim();
             process.env.LOCALAPPDATA = localAppData;
             const candidates = [
-                `${localAppData}\\Programs\\Antigravity\\Antigravity.exe`,
                 `${localAppData}\\Programs\\Antigravity\\bin\\antigravity.cmd`,
+                `${localAppData}\\Programs\\Antigravity\\Antigravity.exe`,
             ];
             for (const winPath of candidates) {
                 const wslPath = toWSLPath(winPath);

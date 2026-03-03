@@ -5,6 +5,7 @@ export class StatusBarUI implements vscode.Disposable {
   private isEnabled = false;
   private isConnecting = false;
   private hasError = false;
+  private isApiMode = false;
 
   constructor() {
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -21,6 +22,15 @@ export class StatusBarUI implements vscode.Disposable {
     this.isEnabled = enabled;
     this.hasError = false;
     this.isConnecting = false;
+    this.isApiMode = false;
+    this.updateDisplay();
+  }
+
+  setApiMode(apiMode: boolean): void {
+    this.isApiMode = apiMode;
+    this.hasError = false;
+    this.isConnecting = false;
+    this.isEnabled = true; // API 모드도 켜진 상태로 간주
     this.updateDisplay();
   }
 
@@ -39,6 +49,16 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.text = '$(sync~spin) Auto: Connecting...';
       this.statusBarItem.backgroundColor = undefined;
       this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+    } else if (this.isApiMode) {
+      this.statusBarItem.text = '$(check) Auto: ON (API Mode)';
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor(
+        'statusBarItem.prominentBackground'
+      );
+      this.statusBarItem.color = new vscode.ThemeColor(
+        'statusBarItem.prominentForeground'
+      );
+      this.statusBarItem.tooltip =
+        'Antigravity Auto Accept is ON (API Mode). Click to disable.';
     } else if (this.hasError) {
       this.statusBarItem.text = '$(error) Auto: Error';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(

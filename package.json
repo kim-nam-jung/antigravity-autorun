@@ -1,8 +1,8 @@
 {
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
-  "description": "Automatically clicks Run/Accept/Accept All buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "2.6.52",
+  "description": "True hands-free automation for Antigravity Agent using lightning-fast CDP Network sniffing and Direct API interactions.",
+  "version": "3.0.0",
   "publisher": "njk",
   "engines": {
     "vscode": "^1.85.0"

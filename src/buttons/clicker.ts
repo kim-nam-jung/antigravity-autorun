@@ -39,7 +39,7 @@ export class ButtonClicker {
     }
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     this.isRunning = false;
     this.observerInjected = false;
 
@@ -49,7 +49,11 @@ export class ButtonClicker {
     }
 
     // Remove observer from page
-    this.removeObserver().catch(console.error);
+    try {
+      await this.removeObserver();
+    } catch (error) {
+      console.error('Failed to remove observer during stop:', error);
+    }
   }
 
   private async injectObserver(): Promise<void> {
