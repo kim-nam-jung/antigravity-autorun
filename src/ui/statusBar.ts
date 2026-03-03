@@ -39,14 +39,17 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.text = '$(sync~spin) Auto: Connecting...';
       this.statusBarItem.backgroundColor = undefined;
       this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
+      this.statusBarItem.command = undefined;
+      this.statusBarItem.tooltip = 'Antigravity Autorun: Connecting to CDP...';
     } else if (this.hasError) {
-      this.statusBarItem.text = '$(error) Auto: Error';
+      this.statusBarItem.text = '$(error) Auto: Error — Click to Restart';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
         'statusBarItem.errorBackground'
       );
       this.statusBarItem.color = undefined;
+      this.statusBarItem.command = 'antigravity-autorun.restartWithCDP';
       this.statusBarItem.tooltip =
-        'CDP connection error. Click to retry or check if Antigravity is running with CDP enabled.';
+        'CDP connection error. Click to restart Antigravity with CDP mode.';
     } else if (this.isEnabled) {
       this.statusBarItem.text = '$(check) Auto: ON';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor(
@@ -55,16 +58,16 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.color = new vscode.ThemeColor(
         'statusBarItem.prominentForeground'
       );
-      this.statusBarItem.tooltip =
-        'Click to toggle Autorun ON/OFF';
+      this.statusBarItem.command = 'antigravity-autorun.toggle';
+      this.statusBarItem.tooltip = 'Click to toggle Autorun ON/OFF';
     } else {
       this.statusBarItem.text = '$(circle-slash) Auto: OFF';
       this.statusBarItem.backgroundColor = undefined;
       this.statusBarItem.color = new vscode.ThemeColor(
         'statusBarItem.foreground'
       );
-      this.statusBarItem.tooltip =
-        'Click to toggle Autorun ON/OFF';
+      this.statusBarItem.command = 'antigravity-autorun.toggle';
+      this.statusBarItem.tooltip = 'Click to toggle Autorun ON/OFF';
     }
   }
 

@@ -2,7 +2,7 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Automatically clicks Run/Accept/Accept All buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "2.6.19",
+  "version": "2.6.43",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
@@ -28,12 +28,11 @@
     "ai"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
-
       {
         "command": "antigravity-autorun.toggle",
         "title": "Antigravity Autorun: Toggle ON/OFF"
@@ -45,6 +44,10 @@
       {
         "command": "antigravity-autorun.restartWithCDP",
         "title": "Antigravity Autorun: Restart Antigravity with CDP"
+      },
+      {
+        "command": "antigravity-autorun.diagnose",
+        "title": "Antigravity Autorun: Diagnose CDP Targets (Debug)"
       }
     ],
     "configuration": {
@@ -72,7 +75,12 @@
         },
         "antigravityAutorun.blockedCommands": {
           "type": "array",
-          "default": ["rm -rf /", "sudo rm", "format", "del /"],
+          "default": [
+            "rm -rf /",
+            "sudo rm",
+            "format",
+            "del /"
+          ],
           "description": "Commands to never autorun"
         }
       }

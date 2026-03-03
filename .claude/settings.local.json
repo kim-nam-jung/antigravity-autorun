@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_navigate"
+    ],
+    "additionalDirectories": [
+      "\\home\\skawn1057\\Development\\antigravity-autorun\\src",
+      "\\\\wsl.localhost\\Ubuntu-24.04\\home\\skawn1057\\Development\\antigravity-autorun\\src"
+    ]
+  }
+}

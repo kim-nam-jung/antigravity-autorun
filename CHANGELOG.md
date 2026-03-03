@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.6.19] - 2026-03-03
+## [2.6.20] - 2026-03-03
 
 ### Fixed
 - Fixed an issue where concurrent Run/Accept buttons were dropped due to throttle.
