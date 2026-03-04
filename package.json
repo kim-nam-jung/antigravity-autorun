@@ -2,7 +2,7 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Automatically clicks Run/Accept/Allow buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "3.0.0",
+  "version": "3.0.9",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
@@ -44,6 +44,14 @@
       {
         "command": "antigravity-autorun.diagnose",
         "title": "Antigravity Autorun: Diagnose CDP Targets (Debug)"
+      },
+      {
+        "command": "antigravity-autorun.showSetupInstructions",
+        "title": "Antigravity Autorun: Show CDP Setup Instructions"
+      },
+      {
+        "command": "antigravity-autorun.relaunchWithCDP",
+        "title": "Antigravity Autorun: Relaunch with CDP Mode"
       }
     ],
     "configuration": {
@@ -98,6 +106,7 @@
     "@typescript-eslint/parser": "^7.0.0",
     "@vitest/coverage-v8": "^4.0.18",
     "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.27.3",
     "eslint": "^8.56.0",
     "typescript": "^5.3.0",
     "vitest": "^4.0.18"

@@ -5,6 +5,7 @@ export class StatusBarUI implements vscode.Disposable {
   private isEnabled = false;
   private isConnecting = false;
   private hasError = false;
+  private needsSetup = false;
 
   constructor() {
     this.statusBarItem = vscode.window.createStatusBarItem(
@@ -21,6 +22,7 @@ export class StatusBarUI implements vscode.Disposable {
     this.isEnabled = enabled;
     this.hasError = false;
     this.isConnecting = false;
+    this.needsSetup = false;
     this.updateDisplay();
   }
 
@@ -34,6 +36,16 @@ export class StatusBarUI implements vscode.Disposable {
     this.updateDisplay();
   }
 
+  setNeedsSetup(value: boolean): void {
+    this.needsSetup = value;
+    if (value) {
+      this.hasError = false;
+      this.isConnecting = false;
+      this.isEnabled = false;
+    }
+    this.updateDisplay();
+  }
+
   private updateDisplay(): void {
     if (this.isConnecting) {
       this.statusBarItem.text = '$(sync~spin) Auto: Connecting...';
@@ -41,6 +53,12 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
       this.statusBarItem.command = undefined;
       this.statusBarItem.tooltip = 'Antigravity Autorun: Connecting to CDP...';
+    } else if (this.needsSetup) {
+      this.statusBarItem.text = '$(gear) Auto: Setup Needed';
+      this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+      this.statusBarItem.color = undefined;
+      this.statusBarItem.command = 'antigravity-autorun.showSetupInstructions';
+      this.statusBarItem.tooltip = 'CDP가 비활성화되어 있습니다. 클릭하여 설정 방법을 확인하세요.';
     } else if (this.hasError) {
       this.statusBarItem.text = '$(error) Auto: Error';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');

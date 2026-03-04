@@ -142,6 +142,16 @@ export class ButtonClicker {
       function isTargetButton(element) {
         if (!element) return false;
 
+        // VS Code UI 사이드바/패널/트리 영역은 제외
+        // (Docker, Explorer, Git 등 확장 패널의 ▶ 버튼이 잘못 클릭되는 것 방지)
+        if (element.closest(
+          '.part.sidebar, .part.activitybar, .part.panel, ' +
+          '.monaco-list-row, .monaco-tl-row, ' +
+          '.pane-body, .split-view-view .pane-body'
+        )) {
+          return false;
+        }
+
         // Skip disabled / invisible
         if (
           element.disabled ||

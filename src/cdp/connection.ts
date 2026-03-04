@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import * as net from 'net';
 import CDP from 'chrome-remote-interface';
 import { isWSL, getWindowsHost, toWSLPath } from '../utils/os';
 
@@ -23,11 +24,44 @@ export interface CDPClient {
   close: () => Promise<void>;
 }
 
-// 로깅 콜백 — extension.ts에서 outputChannel에 라우팅
+// ── 진단용 타입 ──────────────────────────────────────────────────────────────
+
+export interface DevToolsPortStatus {
+  fileFound: boolean;
+  port: number | null;
+  wsPath: string | null;
+  portListening: boolean;
+  stale: boolean; // 파일은 있지만 포트가 닫혀 있음
+}
+
+export type CDPUnavailableReason =
+  | 'stale_port_file'   // DevToolsActivePort 있지만 포트 닫힘
+  | 'no_port_file'      // DevToolsActivePort 파일 없음
+  | 'port_scan_failed'; // 파일 없고 포트 스캔도 실패
+
+export interface CDPConnectFailure {
+  reason: CDPUnavailableReason;
+  port: number | null;
+  filePath?: string;
+}
+
+export class CDPConnectError extends Error {
+  public readonly failure: CDPConnectFailure;
+  constructor(failure: CDPConnectFailure) {
+    super(`CDP unavailable: ${failure.reason} (port=${failure.port})`);
+    this.name = 'CDPConnectError';
+    this.failure = failure;
+  }
+}
+
+// ── 로깅 콜백 ────────────────────────────────────────────────────────────────
+
 let logFn: (msg: string) => void = (msg) => console.log(msg);
 export function setCDPLogger(fn: (msg: string) => void) {
   logFn = fn;
 }
+
+// ── 내부 유틸 ────────────────────────────────────────────────────────────────
 
 function buildUserDataDirs(): string[] {
   const dirs: string[] = [
@@ -35,7 +69,6 @@ function buildUserDataDirs(): string[] {
     path.join(process.env.APPDATA || '', 'Antigravity'),
   ];
 
-  // WSL 환경: /mnt/c/Users/<user>/AppData/Roaming/Antigravity 경로 추가
   if (isWSL()) {
     try {
       const usersDir = '/mnt/c/Users';
@@ -54,7 +87,31 @@ function buildUserDataDirs(): string[] {
 
 const USER_DATA_DIRS = buildUserDataDirs();
 
-function readDevToolsActivePort(): { port: number; wsPath: string } | null {
+/**
+ * TCP 소켓으로 해당 host:port 가 실제로 LISTEN 중인지 확인한다.
+ * Node.js 내장 net 모듈만 사용 (외부 의존성 없음).
+ */
+function isTcpPortListening(host: string, port: number, timeoutMs = 2000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+
+    const done = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(result);
+    };
+
+    socket.setTimeout(timeoutMs);
+    socket.on('connect', () => done(true));
+    socket.on('timeout', () => done(false));
+    socket.on('error', () => done(false));
+    socket.connect(port, host);
+  });
+}
+
+function readDevToolsActivePortRaw(): { port: number; wsPath: string; filePath: string } | null {
   for (const dir of USER_DATA_DIRS) {
     const portFile = path.join(dir, 'DevToolsActivePort');
     try {
@@ -64,17 +121,42 @@ function readDevToolsActivePort(): { port: number; wsPath: string } | null {
         const port = parseInt(lines[0], 10);
         const wsPath = lines[1];
         if (!isNaN(port) && port > 0 && wsPath) {
-          logFn(`[CDP] DevToolsActivePort found: port=${port}, path=${wsPath}`);
-          return { port, wsPath };
+          return { port, wsPath, filePath: portFile };
         }
       }
     } catch {
       // 파일 없음
     }
   }
-  logFn('[CDP] DevToolsActivePort not found, will try port scan');
   return null;
 }
+
+// ── 공개 진단 함수 ────────────────────────────────────────────────────────────
+
+/**
+ * DevToolsActivePort 파일 존재 여부와 실제 포트 생존 여부를 반환한다.
+ * extension.ts의 diagnoseCDP() 와 connect() 양쪽에서 재사용한다.
+ */
+export async function checkDevToolsPortStatus(): Promise<DevToolsPortStatus> {
+  const raw = readDevToolsActivePortRaw();
+  if (!raw) {
+    return { fileFound: false, port: null, wsPath: null, portListening: false, stale: false };
+  }
+
+  const host = isWSL() ? getWindowsHost() : '127.0.0.1';
+  logFn(`[CDP] DevToolsActivePort found: port=${raw.port}, path=${raw.wsPath}`);
+
+  const listening = await isTcpPortListening(host, raw.port);
+  return {
+    fileFound: true,
+    port: raw.port,
+    wsPath: raw.wsPath,
+    portListening: listening,
+    stale: !listening,
+  };
+}
+
+// ── CDPConnection 클래스 ──────────────────────────────────────────────────────
 
 export class CDPConnection {
   private client: CDPClient | null = null;
@@ -83,7 +165,7 @@ export class CDPConnection {
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
 
-  private static readonly PORT_CANDIDATES = [9222, 9223, 9224, 9225];
+  private static readonly PORT_CANDIDATES = [9222];
 
   constructor(port: number = 9222) {
     this.port = port;
@@ -94,33 +176,41 @@ export class CDPConnection {
   isActive(): boolean { return this.isConnected && this.client !== null; }
 
   async connect(): Promise<void> {
-    if (this.isConnected) {
-      return;
-    }
+    if (this.isConnected) return;
 
-    // 이전 stale 연결 정리
     if (this.client) {
       try { await this.client.close(); } catch {}
       this.client = null;
     }
 
-    // 1순위: DevToolsActivePort 파일로 Browser → Page WebSocket 연결
-    const devToolsInfo = readDevToolsActivePort();
-    if (devToolsInfo) {
-      const { port, wsPath } = devToolsInfo;
-      const browserWsUrl = `ws://127.0.0.1:${port}${wsPath}`;
+    const host = isWSL() ? getWindowsHost() : '127.0.0.1';
+
+    // 1순위: DevToolsActivePort 파일 확인 + TCP probe
+    const status = await checkDevToolsPortStatus();
+
+    if (status.fileFound) {
+      if (status.stale) {
+        // 파일은 있지만 포트가 닫혀 있음 → stale 파일, 즉시 실패
+        logFn(`[CDP] Port ${status.port} is NOT listening (stale DevToolsActivePort). CDP disabled.`);
+        throw new CDPConnectError({ reason: 'stale_port_file', port: status.port });
+      }
+
+      // 포트가 살아있음 → WebSocket 연결 시도
+      const browserWsUrl = `ws://${host}:${status.port}${status.wsPath}`;
       logFn(`[CDP] Trying browser WebSocket: ${browserWsUrl}`);
       try {
-        await this.connectViaBrowserEndpoint(browserWsUrl, port);
+        await this.connectViaBrowserEndpoint(browserWsUrl, status.port!, host);
         this.reconnectAttempts = 0;
         return;
       } catch (err) {
         logFn(`[CDP] Browser endpoint failed: ${err}. Falling back to port scan.`);
       }
+    } else {
+      logFn('[CDP] DevToolsActivePort not found, will try port scan');
     }
 
-    // 2순위: HTTP /json 포트 스캔 (폴백)
-    const portsToTry = [this.port, ...CDPConnection.PORT_CANDIDATES.filter(p => p !== this.port)];
+    // 2순위: 포트 스캔 (파일 없거나 WebSocket 연결 실패)
+    const portsToTry = [...new Set([this.port, ...CDPConnection.PORT_CANDIDATES])];
     for (const port of portsToTry) {
       try {
         const connected = await this.tryConnectViaHttpList(port);
@@ -134,10 +224,14 @@ export class CDPConnection {
       }
     }
 
-    throw new Error(`Failed to connect to CDP. Tried DevToolsActivePort and ports: ${portsToTry.join(', ')}`);
+    // 모두 실패
+    if (!status.fileFound) {
+      throw new CDPConnectError({ reason: 'no_port_file', port: null });
+    }
+    throw new CDPConnectError({ reason: 'port_scan_failed', port: this.port });
   }
 
-  private async connectViaBrowserEndpoint(browserWsUrl: string, port: number): Promise<void> {
+  private async connectViaBrowserEndpoint(browserWsUrl: string, port: number, host: string = '127.0.0.1'): Promise<void> {
     const browserClient = await Promise.race([
       CDP({ target: browserWsUrl }),
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('browser connect timeout')), 5000))
@@ -165,7 +259,7 @@ export class CDPConnection {
 
       logFn(`[CDP] Selected target: [${pageTarget.type}] "${pageTarget.title}" | ${pageTarget.url}`);
 
-      const pageWsUrl = `ws://127.0.0.1:${port}/devtools/page/${pageTarget.targetId}`;
+      const pageWsUrl = `ws://${host}:${port}/devtools/page/${pageTarget.targetId}`;
       logFn(`[CDP] Connecting to page WebSocket: ${pageWsUrl}`);
 
       pageClient = await Promise.race([
@@ -254,7 +348,6 @@ export class CDPConnection {
     try {
       return await this.client.Runtime.evaluate({ expression, returnByValue: true });
     } catch (error) {
-      // 연결이 끊긴 경우 재연결 시도
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
         this.isConnected = false;

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
+import * as path from 'path';
 import { isWSL, toWSLPath } from '../utils/os';
 
 const execAsync = promisify(child_process.exec);
@@ -14,7 +15,7 @@ export interface PathFinderResult {
 
 export async function findAntigravityPath(): Promise<PathFinderResult> {
     const triedPaths: string[] = [];
-    
+
     // 1. Check user settings
     const config = vscode.workspace.getConfiguration('antigravityAutorun');
     const userPath = config.get<string>('antigravityPath', '').trim();
@@ -33,6 +34,7 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
     }
     if (process.env.USERNAME) {
         envCandidates.push(`C:\\Users\\${process.env.USERNAME}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
+        envCandidates.push(`C:\\Users\\${process.env.USERNAME}\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe`);
     }
     if (process.env.USERPROFILE) {
         envCandidates.push(`${process.env.USERPROFILE}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
@@ -46,8 +48,9 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
         }
     }
 
-    // 3. Check WSL environment
+    // 3. WSL: glob all users under /mnt/c/Users/
     if (isWSL()) {
+        // 3a. powershell env → LOCALAPPDATA
         try {
             const { stdout } = await execAsync('powershell.exe -Command "[Environment]::GetFolderPath(\'LocalApplicationData\')"');
             const localAppData = stdout.trim();
@@ -67,6 +70,31 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
             // Ignore WSL powershell env errors
         }
 
+        // 3b. Scan all Users directories
+        try {
+            const usersDir = '/mnt/c/Users';
+            const entries = fs.readdirSync(usersDir);
+            const skipDirs = ['Public', 'Default', 'Default User', 'desktop.ini', 'All Users'];
+            for (const entry of entries) {
+                if (skipDirs.includes(entry)) continue;
+                const candidates = [
+                    path.join(usersDir, entry, 'AppData', 'Local', 'Programs', 'Antigravity', 'Antigravity.exe'),
+                    path.join(usersDir, entry, 'AppData', 'Local', 'Programs', 'Antigravity', 'bin', 'antigravity.cmd'),
+                ];
+                for (const wslPath of candidates) {
+                    triedPaths.push(`[WSL-Glob] ${wslPath}`);
+                    if (fs.existsSync(wslPath)) {
+                        // Convert back to Windows path for spawning via powershell
+                        const winPath = wslPath.replace(/^\/mnt\/([a-z])\//, (_, d) => `${d.toUpperCase()}:\\`).replace(/\//g, '\\');
+                        return { path: winPath, method: 'WSL (glob users)', triedPaths };
+                    }
+                }
+            }
+        } catch (e) {
+            // /mnt/c not mounted
+        }
+
+        // 3c. where.exe fallback
         try {
             const { stdout } = await execAsync('where.exe antigravity');
             const p = stdout.trim().split('\n')[0].trim();
