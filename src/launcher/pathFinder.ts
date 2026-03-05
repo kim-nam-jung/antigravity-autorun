@@ -29,16 +29,16 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
     // 2. Check runtime environment variables
     const envCandidates: string[] = [];
     if (process.env.LOCALAPPDATA) {
-        envCandidates.push(`${process.env.LOCALAPPDATA}\\Programs\\Antigravity\\bin\\antigravity.cmd`);
         envCandidates.push(`${process.env.LOCALAPPDATA}\\Programs\\Antigravity\\Antigravity.exe`);
+        envCandidates.push(`${process.env.LOCALAPPDATA}\\Programs\\Antigravity\\bin\\antigravity.cmd`);
     }
     if (process.env.USERNAME) {
-        envCandidates.push(`C:\\Users\\${process.env.USERNAME}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
         envCandidates.push(`C:\\Users\\${process.env.USERNAME}\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe`);
+        envCandidates.push(`C:\\Users\\${process.env.USERNAME}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
     }
     if (process.env.USERPROFILE) {
-        envCandidates.push(`${process.env.USERPROFILE}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
         envCandidates.push(`${process.env.USERPROFILE}\\AppData\\Local\\Programs\\Antigravity\\Antigravity.exe`);
+        envCandidates.push(`${process.env.USERPROFILE}\\AppData\\Local\\Programs\\Antigravity\\bin\\antigravity.cmd`);
     }
 
     for (const candidate of envCandidates) {
@@ -56,8 +56,8 @@ export async function findAntigravityPath(): Promise<PathFinderResult> {
             const localAppData = stdout.trim();
             process.env.LOCALAPPDATA = localAppData;
             const candidates = [
-                `${localAppData}\\Programs\\Antigravity\\bin\\antigravity.cmd`,
                 `${localAppData}\\Programs\\Antigravity\\Antigravity.exe`,
+                `${localAppData}\\Programs\\Antigravity\\bin\\antigravity.cmd`,
             ];
             for (const winPath of candidates) {
                 const wslPath = toWSLPath(winPath);

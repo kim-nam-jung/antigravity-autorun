@@ -1,42 +1,34 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the Antigravity Autorun extension.
 
-## [2.6.20] - 2026-03-03
-
-### Fixed
-- Fixed an issue where concurrent Run/Accept buttons were dropped due to throttle.
-- Added queue system to sequentially click all valid buttons.
-- Skipped disabled, hidden, or zero-width buttons accurately.
-- Improved icon-only button detection explicitly using `aria-label` and `title`.
-
-## [1.2.0] - 2026-03-02
-
-### Fixed
-- Fixed CDP connection to target Launchpad (Agent panel) instead of workbench
-- Run/Accept buttons are now properly detected
+## [3.0.22] - 2024-03-05
 
 ### Added
-- Priority-based target selection: Launchpad > jetski-agent > workbench
+- Desktop shortcut creation for CDP mode
+- "Launch CDP Mode" button
+- All messages in English
 
-## [1.1.0] - 2026-03-02
-
-### Added
-- Auto-restart Antigravity with CDP mode when connection fails
-- "Yes, Restart" prompt on CDP connection failure
-- `restartWithCDP` command for manual restart
+### Changed
+- Prioritize .exe over .cmd detection
+- Improved error handling
 
 ### Fixed
-- Better error handling for CDP connection
+- Stale DevToolsActivePort cleanup
+- PowerShell command escaping
+- Single-instance lock handling
 
-## [1.0.0] - 2026-03-02
+## [3.0.0] - 2024-02-25
 
 ### Added
-- Initial release
-- Auto-click Run, Accept, Accept All, Confirm, Allow buttons
-- MutationObserver-based button detection
-- Auto-scroll for hidden buttons
-- Blocked commands list (rm -rf, sudo, etc.)
-- Status bar toggle (Auto: ON/OFF)
-- CDP connection management
-- Configurable CDP port, delay, auto-scroll
+- CDP Network Domain sniffing
+- Direct REST API approvals
+- Zero-latency architecture
+
+### Changed
+- Complete rewrite from DOM to Network API
+- 0ms approval latency
+
+### Removed
+- DOM-based ButtonClicker
+- Mouse simulation

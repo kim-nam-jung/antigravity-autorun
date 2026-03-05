@@ -1,0 +1,11 @@
+--- src/extension.ts
++++ src/extension.ts
+@@ -208,6 +208,8 @@
+   // -EncodedCommand: WSL bash의 괄호/글로빙 간섭 없이 PowerShell에 명령 전달
+   const psScript = `Start-Process -FilePath "${exePath}" -ArgumentList "--user-data-dir=${userDataDir}","--remote-debugging-port=${cdpPort}"`;
+   const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
++  log(`[Launcher] PowerShell script: ${psScript}`);
++  log(`[Launcher] Base64 length: ${encoded.length}`);
+ 
+   try {
+     const cleanEnv = { ...process.env };

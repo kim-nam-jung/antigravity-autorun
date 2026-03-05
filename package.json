@@ -1,8 +1,8 @@
 {
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
-  "description": "Automatically clicks Run/Accept/Allow buttons in Antigravity IDE using CDP. True hands-free automation for your Antigravity Agent.",
-  "version": "3.0.15",
+  "description": "Hands-free automation for Antigravity AI Agent. Auto-approves Run/Accept/Allow commands using CDP network interception. Zero latency, maximum stability.",
+  "version": "3.0.23",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
@@ -10,22 +10,23 @@
   },
   "categories": [
     "Other",
-    "Machine Learning"
+    "Testing"
   ],
   "galleryBanner": {
-    "color": "#1e1e1e",
+    "color": "#0066cc",
     "theme": "dark"
   },
   "keywords": [
     "antigravity",
-    "Antigravity",
-    "autorun",
     "automation",
     "auto-accept",
-    "auto-click",
+    "auto-approve",
     "cdp",
+    "chrome-devtools-protocol",
     "agent",
-    "ai"
+    "ai",
+    "vscode",
+    "productivity"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -116,7 +117,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kim-nam-jung/antigravity-autorun"
+    "url": "https://github.com/yourusername/antigravity-autorun.git"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/yourusername/antigravity-autorun/issues"
+  },
+  "homepage": "https://github.com/yourusername/antigravity-autorun#readme",
+  "author": {
+    "name": "njk"
+  }
 }

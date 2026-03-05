@@ -1,89 +1,154 @@
-# Antigravity Autorun v3.0
+# Antigravity Autorun
 
-> True hands-free automation for your Antigravity Agent, reimagined.
+> **True hands-free automation for Antigravity AI Agent**
 
-Automatically authorizes **Run**, **Accept**, **Confirm**, and **Allow** commands in Google Antigravity IDE without simulating janky and slow mouse clicks.
-
----
-
-## Version 3.0: The API Sniffer Model
-
-Prior to v3.0, Antigravity Autorun relied on `MutationObserver` to scan the DOM and dispatch mouse clicks. This was CPU heavy, slow, and prone to breaking on UI updates.
-
-**Version 3.0 completely replaces the DOM Clicker.**
-
-- Using **CDP Network Domain sniffing**, we intercept `HandleCascadeUserInteraction` packets the millisecond they are sent from the Language Server to the Frontend.
-- The extension fires a direct `fetch` POST request to the backend's hidden API, instantly approving the interaction.
-- Result: **0ms delay**, zero UI dependencies, maximum stability.
+Automatically approves **Run**, **Accept**, **Confirm**, and **Allow** commands in Antigravity IDE using Chrome DevTools Protocol (CDP).
 
 ---
 
-## Features
+## 🚀 Features
 
-- **Direct API Approvals** — Interactions are accepted instantly over REST.
-- **Network-Level Sniffing** — Immune to CSS/DOM updates.
-- **Auto CDP Relaunch** — If Antigravity is not running with CDP mode, the extension **automatically restarts it** with `--remote-debugging-port=9222`. No manual steps needed.
-- **Dangerous Command Blocking** — Prevents auto-accepting `rm -rf`, `sudo`, etc.
-- **Status Bar Toggle** — One-click ON/OFF.
+### **Zero-Latency API Approvals**
+- Intercepts `HandleCascadeUserInteraction` packets at the network level
+- Direct REST API calls to backend — **0ms delay**
+- Immune to CSS/DOM changes
 
----
+### **One-Click CDP Setup**
+- Click "Launch CDP Mode" button to create desktop shortcut
+- Double-click shortcut to start Antigravity with CDP enabled
+- No manual configuration needed
 
-## How to Use
-
-1. Install the extension.
-2. Launch Antigravity normally — the extension will automatically detect if CDP is not enabled and **restart Antigravity with CDP mode**.
-3. Look for **`✓ Auto: ON`** in the status bar.
-4. Start using Antigravity Agent — interaction requests will be sniffed and automatically approved!
-
-> **No manual setup required.** The extension handles everything automatically.
+### **Smart Safety**
+- Blocks dangerous commands (`rm -rf`, `sudo`, etc.)
+- Toggle ON/OFF via status bar
+- Network-level interception — stable & reliable
 
 ---
 
-## Status Bar
+## 📦 Installation
 
-| Status | Meaning |
-|--------|---------|
-| `✓ Auto: ON` | Active — requests are being sniffed & approved |
+### Open VSX Registry
+```bash
+code --install-extension njk.antigravity-autorun
+```
+
+### Manual Installation
+1. Download `.vsix` from [Releases](https://github.com/yourusername/antigravity-autorun/releases)
+2. `Extensions: Install from VSIX...` in Command Palette
+
+---
+
+## 🎯 Quick Start
+
+1. **Install extension**
+2. **Click "Launch CDP Mode"** when prompted
+3. **Close Antigravity and double-click the desktop shortcut**
+4. Look for **`✓ Auto: ON`** in status bar
+5. Start using Antigravity Agent — interactions are auto-approved!
+
+---
+
+## 🎛️ Status Bar
+
+| Icon | Meaning |
+|------|---------|
+| `✓ Auto: ON` | Active — auto-approving interactions |
 | `⊘ Auto: OFF` | Disabled — click to enable |
-| `↻ Auto: Connecting...` | Connecting or restarting Antigravity |
-| `⊗ Auto: Error` | CDP connection failed |
+| `↻ Connecting...` | Reconnecting to CDP |
+| `⊗ Error` | CDP connection failed — click for help |
 
 ---
 
-## Command Palette (`Ctrl+Shift+P`)
+## ⚙️ Commands
 
 - `Antigravity Autorun: Toggle ON/OFF`
 - `Antigravity Autorun: Reconnect CDP`
-- `Antigravity Autorun: Relaunch with CDP Mode`
-- `Antigravity Autorun: Diagnose CDP Targets (Debug)`
-- `Antigravity Autorun: Show CDP Setup Instructions`
+- `Antigravity Autorun: Launch CDP Mode`
+- `Antigravity Autorun: Diagnostic Log`
+- `Antigravity Autorun: Setup Instructions`
 
 ---
 
-## Settings
+## 🔧 Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `antigravityAutorun.enabled` | `true` | Enable on startup |
-| `antigravityAutorun.cdpPort` | `9222` | CDP port |
-| `antigravityAutorun.blockedCommands` | `["rm -rf /", ...]` | Never auto-approve these commands |
+| `antigravityAutorun.cdpPort` | `9222` | Chrome DevTools Protocol port |
+| `antigravityAutorun.blockedCommands` | `["rm -rf /", ...]` | Never auto-approve these |
 
 ---
 
-## Release Notes
+## 📝 How It Works
 
-### 3.0.5
-- **[FIX]** Auto CDP relaunch now works correctly. Previously, killing Antigravity also killed the extension (child process), preventing restart. Now uses an independent external PowerShell process to perform the restart.
-- **[FIX]** All CDP failure types (`stale_port_file`, `no_port_file`, `port_scan_failed`) now trigger auto-relaunch.
-- **[FIX]** Port detection uses direct TCP check instead of DevToolsActivePort file.
+1. **Network Sniffing**: Uses CDP Network Domain to intercept WebSocket messages
+2. **Pattern Matching**: Detects `HandleCascadeUserInteraction` packets
+3. **Direct API Call**: Sends approval via backend REST API
+4. **Zero Dependency**: No DOM observation, no mouse simulation
+
+**Architecture:**
+```
+Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
+                                              ↓
+                                         Instant Approval
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### "CDP is disabled" error
+1. Click **"Launch CDP Mode"** button
+2. Close current Antigravity
+3. Use desktop shortcut to restart
+
+### Desktop shortcut not working
+1. Open Command Palette (`Ctrl+Shift+P`)
+2. Run `Antigravity Autorun: Setup Instructions`
+3. Follow manual setup guide
+
+### Still not working?
+1. Run `Antigravity Autorun: Diagnostic Log`
+2. Check output for errors
+3. Report issue with log output
+
+---
+
+## 📋 Requirements
+
+- **Antigravity IDE** (VSCode fork with AI Agent)
+- **Windows** (PowerShell for CDP launcher)
+- **CDP Port Access** (default: 9222)
+
+---
+
+## 📜 Release Notes
+
+### 3.0.22
+- **[NEW]** Desktop shortcut creation for CDP mode
+- **[NEW]** All messages in English
+- **[FIX]** Improved .exe path detection (prioritize over .cmd)
+- **[FIX]** Stale DevToolsActivePort file cleanup
 
 ### 3.0.0
-- **[MAJOR]** Complete architectural rewrite. Replaced DOM `ButtonClicker` with `NetworkAutoAccept` sniffer and `InteractionApi`.
-- **[PERFORMANCE]** Immediate 0ms API-driven Accept.
-- **[STABILITY]** Immune to DOM/CSS changes.
+- **[MAJOR]** Complete rewrite using CDP Network API
+- **[PERFORMANCE]** 0ms approval latency
+- **[STABILITY]** Immune to DOM/CSS changes
 
 ---
 
-## License
+## 📄 License
 
-MIT
+MIT © 2024
+
+---
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/yourusername/antigravity-autorun)
+- [Report Issues](https://github.com/yourusername/antigravity-autorun/issues)
+- [Changelog](CHANGELOG.md)
+
+---
+
+**Made for Antigravity AI Agent users who want true hands-free automation** ✨

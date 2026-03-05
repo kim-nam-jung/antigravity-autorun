@@ -1,14 +1,10 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
-import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkDevToolsPortStatus, deleteStaleDevToolsPortFile } from './cdp/connection';
+import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkDevToolsPortStatus } from './cdp/connection';
 import { ButtonClicker } from './buttons/clicker';
 import { StatusBarUI } from './ui/statusBar';
 import { findAntigravityPath } from './launcher/pathFinder';
 import CDP from 'chrome-remote-interface';
-import { promisify } from 'util';
-import { isWSL } from './utils/os';
-
-const execAsync = promisify(cp.exec);
 
 let cdpConnection: CDPConnection | null = null;
 let buttonClicker: ButtonClicker | null = null;
@@ -144,115 +140,98 @@ async function handleCDPConnectError(failure: CDPConnectFailure) {
 
   let message: string;
   if (reason === 'stale_port_file') {
-    message = 'Antigravity Autorun: CDP is disabled (port closed)';
+    message = 'Antigravity Autorun: CDP가 비활성화되어 있습니다. (포트 닫힘)';
   } else if (reason === 'no_port_file') {
-    message = 'Antigravity Autorun: CDP is disabled (--remote-debugging-port flag required)';
+    message = 'Antigravity Autorun: CDP가 비활성화되어 있습니다. (--remote-debugging-port 플래그 필요)';
   } else {
-    message = `Antigravity Autorun: CDP connection failed (port=${failure.port})`;
+    message = `Antigravity Autorun: CDP 연결 실패 (port=${failure.port})`;
   }
 
   log(`[Autorun] ${message}`);
 
   const selected = await vscode.window.showWarningMessage(
     message,
-    'Launch CDP Mode',
-    'Setup Instructions',
-    'Diagnostic Log',
-    'Close'
+    'AI에게 MCP 실행 요청',
+    '설치 방법 보기',
+    '진단 로그',
+    '닫기'
   );
-  if (selected === 'Launch CDP Mode') {
-    await enableCDPNatively();
-  } else if (selected === 'Setup Instructions') {
+
+  if (selected === 'AI에게 MCP 실행 요청') {
+    await vscode.env.clipboard.writeText('Please run mcp_antigravity-powershell_launch_antigravity_cdp to start my editor in CDP mode.');
+    vscode.window.showInformationMessage('프롬프트가 복사되었습니다. AI 채팅창에 붙여넣어 에디터를 재실행하세요.');
+  } else if (selected === '설치 방법 보기') {
     await showCDPSetupInstructions();
-  } else if (selected === 'Diagnostic Log') {
+  } else if (selected === '진단 로그') {
     await diagnoseCDP();
   }
 }
+
+// ── 자동 실행 (CDP Native Launch) ──────────────────────────────────────────────
 
 async function enableCDPNatively() {
   if (statusBarUI) {
     statusBarUI.setConnecting(true);
   }
-
+  
   const pathResult = await findAntigravityPath();
   const exePath = pathResult.path;
   const config = vscode.workspace.getConfiguration('antigravityAutorun');
   const cdpPort = config.get<number>('cdpPort', 9222);
 
   if (!exePath) {
-    vscode.window.showErrorMessage('Antigravity executable not found.');
+    vscode.window.showErrorMessage('Antigravity 실행 파일을 찾을 수 없습니다. 경로 설정이나 환경 변수를 확인해주세요.');
     if (statusBarUI) statusBarUI.setNeedsSetup(true);
     return;
   }
 
-  deleteStaleDevToolsPortFile();
-  log(`[Launcher] Creating CDP shortcut...`);
+  log(`[Launcher] Launching Antigravity with CDP using port ${cdpPort}...`);
+  log(`[Launcher] Executable Path: ${exePath}`);
 
-  let localAppData = process.env.LOCALAPPDATA || '';
-  if (!localAppData && isWSL()) {
-    try {
-      const r = await execAsync('powershell.exe -Command "[Environment]::GetFolderPath(\\x27LocalApplicationData\\x27)]"');
-      localAppData = r.stdout.trim();
-    } catch {}
-  }
-  if (!localAppData) {
-    localAppData = `C:\\Users\\${process.env.USERNAME}\\AppData\\Local`;
-  }
-
-  const userDataDir = `${localAppData}\\Temp\\AgCDPProfile`;
-
-  // Create PowerShell script to create shortcut
-  const shortcutScript = `
-$WshShell = New-Object -ComObject WScript.Shell
-$Desktop = [Environment]::GetFolderPath('Desktop')
-$Shortcut = $WshShell.CreateShortcut("$Desktop\\Antigravity CDP Mode.lnk")
-$Shortcut.TargetPath = "${exePath}"
-$Shortcut.Arguments = "--user-data-dir=${userDataDir} --remote-debugging-port=${cdpPort}"
-$Shortcut.WorkingDirectory = Split-Path "${exePath}"
-$Shortcut.Description = "Antigravity with CDP on port ${cdpPort}"
-$Shortcut.Save()
-Write-Output "Shortcut created"
-`.trim();
-
-  const encoded = Buffer.from(shortcutScript, 'utf16le').toString('base64');
+  const psCommand = `& "${exePath}" --user-data-dir="$env:LOCALAPPDATA\\Temp\\AgCDPProfile" --remote-debugging-port=${cdpPort}`;
 
   try {
-    const result = await execAsync(`powershell.exe -NoProfile -EncodedCommand ${encoded}`);
-    log(`[Launcher] Shortcut created: ${result.stdout}`);
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.ELECTRON_RUN_AS_NODE;
 
-    const action = await vscode.window.showInformationMessage(
-      `Shortcut "Antigravity CDP Mode" created on desktop.\n\n1. Close current Antigravity\n2. Double-click the desktop shortcut`,
-      'OK',
-      'Open Desktop'
-    );
+    const agProcess = cp.spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], {
+      detached: true,
+      stdio: 'ignore',
+      env: cleanEnv
+    });
+    agProcess.unref();
 
-    if (action === 'Open Desktop') {
-      const desktopPath = process.env.USERPROFILE ? `${process.env.USERPROFILE}\\Desktop` : '';
-      if (desktopPath) {
-        await execAsync(`explorer.exe "${desktopPath}"`);
-      }
-    }
+    log(`[Launcher] Process spawned successfully.`);
+    vscode.window.showInformationMessage(`Antigravity가 포트 ${cdpPort}에서 CDP와 함께 실행되었습니다. 곧 자동 연결을 시도합니다...`);
 
-    if (statusBarUI) statusBarUI.setNeedsSetup(false);
+    // Give it some time to start up before reconnecting
+    setTimeout(() => {
+      reconnectCDP().catch(err => {
+        log(`[Launcher] Auto-reconnect failed: ${err}`);
+      });
+    }, 2000);
 
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log(`[Launcher] Failed to create shortcut: ${message}`);
-    vscode.window.showErrorMessage(`Failed to create shortcut: ${message}`);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    log(`[Launcher] Failed to launch CDP: ${message}`);
+    vscode.window.showErrorMessage(`Failed to launch CDP: ${message}`);
     if (statusBarUI) statusBarUI.setNeedsSetup(true);
   }
 }
+
+// ── 수동 재실행 (메뉴 명령) ───────────────────────────────────────────────────
+
 async function relaunchWithCDP() {
   const confirm = await vscode.window.showInformationMessage(
-    'Copy prompt to restart Antigravity in CDP mode via AI?',
+    'AI를 통해 Antigravity를 CDP 모드로 재실행하기 위한 프롬프트를 복사하시겠습니까?',
     { modal: true },
-    'Copy Prompt',
-    'Cancel'
+    '복사하기',
+    '취소'
   );
-  if (confirm !== 'Copy Prompt') return;
+  if (confirm !== '복사하기') return;
 
   await vscode.env.clipboard.writeText('Please run mcp_antigravity-powershell_launch_antigravity_cdp to start my editor in CDP mode.');
-  vscode.window.showInformationMessage('Prompt copied. Paste it in AI chat to restart the editor.');
+  vscode.window.showInformationMessage('프롬프트가 복사되었습니다. AI 채팅창에 붙여넣어 에디터를 재실행하세요.');
 }
 
 async function showCDPSetupInstructions() {

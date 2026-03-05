@@ -156,6 +156,22 @@ export async function checkDevToolsPortStatus(): Promise<DevToolsPortStatus> {
   };
 }
 
+/**
+ * stale DevToolsActivePort 파일을 삭제한다.
+ * Antigravity 재실행 전에 호출해 이전 세션의 파일이 남아있지 않게 한다.
+ */
+export function deleteStaleDevToolsPortFile(): void {
+  const raw = readDevToolsActivePortRaw();
+  if (raw) {
+    try {
+      fs.unlinkSync(raw.filePath);
+      logFn(`[CDP] Deleted stale DevToolsActivePort: ${raw.filePath}`);
+    } catch (e) {
+      logFn(`[CDP] Failed to delete DevToolsActivePort: ${e}`);
+    }
+  }
+}
+
 // ── CDPConnection 클래스 ──────────────────────────────────────────────────────
 
 export class CDPConnection {

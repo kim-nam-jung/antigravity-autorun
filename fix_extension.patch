@@ -1,0 +1,67 @@
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -1,6 +1,6 @@
+ import * as vscode from 'vscode';
+ import * as cp from 'child_process';
+-import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkDevToolsPortStatus } from './cdp/connection';
++import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkDevToolsPortStatus, deleteStaleDevToolsPortFile } from './cdp/connection';
+ import { ButtonClicker } from './buttons/clicker';
+ import { StatusBarUI } from './ui/statusBar';
+ import { findAntigravityPath } from './launcher/pathFinder';
+@@ -186,10 +186,26 @@
+     return;
+   }
+
++  // 이전 세션의 stale DevToolsActivePort 파일 삭제
++  deleteStaleDevToolsPortFile();
++
+   log(`[Launcher] Launching Antigravity with CDP using port ${cdpPort}...`);
+   log(`[Launcher] Executable Path: ${exePath}`);
+
+-  const psCommand = `& "${exePath}" --user-data-dir="$env:LOCALAPPDATA\\Temp\\AgCDPProfile" --remote-debugging-port=${cdpPort}`;
++  // LOCALAPPDATA를 WSL에서 사전 resolve
++  let localAppData = process.env.LOCALAPPDATA || '';
++  if (!localAppData && isWSL()) {
++    try {
++      const { stdout } = await execAsync(`powershell.exe -Command "[Environment]::GetFolderPath('LocalApplicationData')"`);
++      localAppData = stdout.trim();
++    } catch {}
++  }
++  const userDataDir = localAppData
++    ? `${localAppData}\\Temp\\AgCDPProfile`
++    : `%LOCALAPPDATA%\\Temp\\AgCDPProfile`;
++
++  const psScript = `Start-Process -FilePath "${exePath}" -ArgumentList "--user-data-dir=${userDataDir}","--remote-debugging-port=${cdpPort}"`;
++  const encoded = Buffer.from(psScript, 'utf16le').toString('base64');
+
+   try {
+     const cleanEnv = { ...process.env };
+@@ -197,11 +213,20 @@
+
+-    const agProcess = cp.spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], {
++    const agProcess = cp.spawn("powershell.exe", ["-NoProfile", "-EncodedCommand", encoded], {
+       detached: true,
+-      stdio: 'ignore',
++      stdio: ['ignore', 'pipe', 'pipe'],
+       env: cleanEnv
+     });
++
++    agProcess.stderr?.on('data', (data: Buffer) => {
++      const msg = data.toString().trim();
++      if (msg && !msg.includes('CLIXML')) {
++        log(`[Launcher] PowerShell: ${msg}`);
++      }
++    });
++
+     agProcess.unref();
+
+     log(`[Launcher] Process spawned successfully.`);
+@@ -212,7 +237,7 @@
+       reconnectCDP().catch(err => {
+         log(`[Launcher] Auto-reconnect failed: ${err}`);
+       });
+-    }, 2000);
++    }, 6000);
+
+   } catch (error) {
+     const message = error instanceof Error ? error.message : 'Unknown error';
