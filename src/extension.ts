@@ -188,26 +188,12 @@ async function enableCDPNatively() {
   deleteStaleDevToolsPortFile();
   log(`[Launcher] Creating CDP shortcut...`);
 
-  let localAppData = process.env.LOCALAPPDATA || '';
-  if (!localAppData && isWSL()) {
-    try {
-      const r = await execAsync('powershell.exe -Command "[Environment]::GetFolderPath(\\x27LocalApplicationData\\x27)]"');
-      localAppData = r.stdout.trim();
-    } catch {}
-  }
-  if (!localAppData) {
-    localAppData = `C:\\Users\\${process.env.USERNAME}\\AppData\\Local`;
-  }
-
-  const userDataDir = `${localAppData}\\Temp\\AgCDPProfile`;
-
-  // Create PowerShell script to create shortcut
   const shortcutScript = `
 $WshShell = New-Object -ComObject WScript.Shell
 $Desktop = [Environment]::GetFolderPath('Desktop')
 $Shortcut = $WshShell.CreateShortcut("$Desktop\\Antigravity CDP Mode.lnk")
 $Shortcut.TargetPath = "${exePath}"
-$Shortcut.Arguments = "--user-data-dir=${userDataDir} --remote-debugging-port=${cdpPort}"
+$Shortcut.Arguments = "--remote-debugging-port=${cdpPort}"
 $Shortcut.WorkingDirectory = Split-Path "${exePath}"
 $Shortcut.Description = "Antigravity with CDP on port ${cdpPort}"
 $Shortcut.Save()

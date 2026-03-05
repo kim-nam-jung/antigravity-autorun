@@ -2,7 +2,7 @@
 
 > **True hands-free automation for Antigravity AI Agent**
 
-Automatically approves **Run**, **Accept**, **Confirm**, and **Allow** commands in Antigravity IDE using Chrome DevTools Protocol (CDP).
+Automatically approves **Run**, **Confirm**, and **Allow** commands in Antigravity IDE using Chrome DevTools Protocol (CDP).
 
 ---
 

@@ -73,7 +73,6 @@ export class ButtonClicker {
         /^allow this conversation$/i,
         /^allow$/i,
         /^allow always$/i,
-        /^accept$/i,
         /^yes$/i,
         /^approve$/i,
       ];
@@ -83,7 +82,6 @@ export class ButtonClicker {
         /\\brun\\b/i,
         /\\bretry\\b/i,
         /\\bconfirm\\b/i,
-        /\\baccept\\b/i,
         /\\bexecute\\b/i,
         /\\bapprove\\b/i,
       ];
