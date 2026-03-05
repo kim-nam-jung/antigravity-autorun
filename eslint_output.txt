@@ -1,25 +1,19 @@
 
-> antigravity-autorun@2.6.52 lint
+> antigravity-autorun@3.0.14 lint
 > eslint src --ext ts
 
 
-/home/skawn1057/Development/antigravity-autorun/src/buttons/clicker.ts
-  5:7  warning  'BUTTON_SELECTORS' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
 /home/skawn1057/Development/antigravity-autorun/src/cdp/connection.ts
-  2:13  warning  'fs' is defined but never used  @typescript-eslint/no-unused-vars
+    6:33  warning  'toWSLPath' is defined but never used  @typescript-eslint/no-unused-vars
+  182:48  error    Empty block statement                  no-empty
+  280:50  error    Empty block statement                  no-empty
+  336:15  error    Empty block statement                  no-empty
 
 /home/skawn1057/Development/antigravity-autorun/src/extension.ts
+  3:13  warning  'fs' is defined but never used    @typescript-eslint/no-unused-vars
   4:13  warning  'os' is defined but never used    @typescript-eslint/no-unused-vars
   5:13  warning  'path' is defined but never used  @typescript-eslint/no-unused-vars
-  6:13  warning  'fs' is defined but never used    @typescript-eslint/no-unused-vars
-
-/home/skawn1057/Development/antigravity-autorun/src/launcher/pathFinder.ts
-  66:17  error  Empty block statement  no-empty
-  72:17  error  Empty block statement  no-empty
-
-/home/skawn1057/Development/antigravity-autorun/src/utils/os.ts
-  23:11  error  Empty block statement  no-empty
+  6:13  warning  'net' is defined but never used   @typescript-eslint/no-unused-vars
 
 ✖ 8 problems (3 errors, 5 warnings)
 

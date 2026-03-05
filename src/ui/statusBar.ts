@@ -57,8 +57,8 @@ export class StatusBarUI implements vscode.Disposable {
       this.statusBarItem.text = '$(gear) Auto: Setup Needed';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
       this.statusBarItem.color = undefined;
-      this.statusBarItem.command = 'antigravity-autorun.showSetupInstructions';
-      this.statusBarItem.tooltip = 'CDP가 비활성화되어 있습니다. 클릭하여 설정 방법을 확인하세요.';
+      this.statusBarItem.command = 'antigravity-autorun.enableCDPNatively';
+      this.statusBarItem.tooltip = 'Click to automatically enable CDP and reconnect.';
     } else if (this.hasError) {
       this.statusBarItem.text = '$(error) Auto: Error';
       this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');

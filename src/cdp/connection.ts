@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as net from 'net';
 import CDP from 'chrome-remote-interface';
-import { isWSL, getWindowsHost, toWSLPath } from '../utils/os';
+import { isWSL, getWindowsHost } from '../utils/os';
 
 export interface CDPClient {
   Runtime: {
@@ -179,7 +179,7 @@ export class CDPConnection {
     if (this.isConnected) return;
 
     if (this.client) {
-      try { await this.client.close(); } catch {}
+      try { await this.client.close(); } catch (e) { /* ignore */ }
       this.client = null;
     }
 
@@ -277,7 +277,7 @@ export class CDPConnection {
       logFn(`[CDP] Connected to page on port ${port}`);
 
     } finally {
-      try { await browserClient.close(); } catch {}
+      try { await browserClient.close(); } catch (e) { /* ignore */ }
     }
   }
 
@@ -333,7 +333,7 @@ export class CDPConnection {
       try {
         (this.client as any).removeAllListeners?.('disconnect');
         await this.client.close();
-      } catch {}
+      } catch (e) { /* ignore */ }
       this.client = null;
     }
     this.isConnected = false;

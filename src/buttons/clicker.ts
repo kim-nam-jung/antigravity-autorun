@@ -73,21 +73,25 @@ export class ButtonClicker {
         /^allow this conversation$/i,
         /^allow$/i,
         /^allow always$/i,
+        /^accept$/i,
+        /^yes$/i,
+        /^approve$/i,
       ];
 
       // General button patterns
       const BUTTON_PATTERNS = [
         /\\brun\\b/i,
         /\\bretry\\b/i,
-        /\\baccept(\\s|$|\\b)/i,
         /\\bconfirm\\b/i,
+        /\\baccept\\b/i,
+        /\\bexecute\\b/i,
+        /\\bapprove\\b/i,
       ];
 
       const EXCLUDE_PATTERNS = [
         /^always run/i,
         /run button/i,
         /retry button/i,
-        /accept\\/allow/i,
         /auto click settings/i,
       ];
 
@@ -118,16 +122,19 @@ export class ButtonClicker {
       // (Reject / Decline / Cancel / No / Don't run / etc.).
       function isInRunCommandDialog(element) {
         // Walk up to find a container that acts as a dialog/group
-        // Try up to 5 levels to accommodate various DOM structures
+        // Try up to 15 levels to accommodate deeply nested Tailwind layouts
         let container = element.parentElement;
-        for (let i = 0; i < 5 && container; i++) {
+        for (let i = 0; i < 15 && container; i++) {
           const siblings = container.querySelectorAll(
             'button, [role="button"], .cursor-pointer, vscode-button'
           );
           const hasNegativeButton = Array.from(siblings).some(s =>
             s !== element && NEGATIVE_PATTERNS.some(p => p.test((s.textContent || '').trim()))
           );
-          if (hasNegativeButton) return true;
+          if (hasNegativeButton) {
+            console.log('[Autorun] Found negative button sibling in parent depth:', i);
+            return true;
+          }
           container = container.parentElement;
         }
 

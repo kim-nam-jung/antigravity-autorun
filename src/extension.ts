@@ -1,14 +1,9 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import * as net from 'net';
 import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkDevToolsPortStatus } from './cdp/connection';
 import { ButtonClicker } from './buttons/clicker';
 import { StatusBarUI } from './ui/statusBar';
 import { findAntigravityPath } from './launcher/pathFinder';
-import { isWSL } from './utils/os';
 import CDP from 'chrome-remote-interface';
 
 let cdpConnection: CDPConnection | null = null;
@@ -49,6 +44,7 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('antigravity-autorun.diagnose', () => diagnoseCDP()),
     vscode.commands.registerCommand('antigravity-autorun.showSetupInstructions', () => showCDPSetupInstructions()),
     vscode.commands.registerCommand('antigravity-autorun.relaunchWithCDP', () => relaunchWithCDP()),
+    vscode.commands.registerCommand('antigravity-autorun.enableCDPNatively', () => enableCDPNatively()),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('antigravityAutorun')) {
         handleConfigChange();
@@ -128,174 +124,17 @@ function isAntigravityProcessRunning(): Promise<boolean> {
   });
 }
 
-// ── 자동 재실행 (완전 자동 — 팝업 없음) ────────────────────────────────────────
-
-/**
- * TCP 포트 열림 여부를 직접 확인한다 (DevToolsActivePort 파일 불필요).
- */
-function isTcpPortOpen(host: string, port: number, timeoutMs = 2000): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new net.Socket();
-    let settled = false;
-    const done = (result: boolean) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(result);
-    };
-    socket.setTimeout(timeoutMs);
-    socket.on('connect', () => done(true));
-    socket.on('timeout', () => done(false));
-    socket.on('error', () => done(false));
-    socket.connect(port, host);
-  });
-}
-
-/**
- * Antigravity 경로를 탐지하여 CDP 모드로 자동 재실행한다.
- *
- * ⚠️ 핵심 설계: Extension은 Antigravity의 자식 프로세스이므로
- * 직접 taskkill → spawn 방식은 Antigravity 종료 시 Extension도
- * 같이 종료되어 spawn 명령이 실행되지 않는다.
- *
- * 해결책: 임시 PowerShell 스크립트를 작성하고 완전히 독립된
- * Start-Process로 실행한다. 이 스크립트는 Antigravity 프로세스 트리
- * 밖에서 실행되므로 Antigravity가 종료돼도 계속 실행된다.
- *
- * 최대 waitSec초 동안 포트가 열릴 때까지 폴링한 후 true/false 반환.
- */
-async function autoRelaunchWithCDP(waitSec = 25): Promise<boolean> {
-  log('[AutoRelaunch] CDP 미연결 — Antigravity 경로 탐색 중...');
-
-  const found = await findAntigravityPath();
-  if (!found.path) {
-    log(`[AutoRelaunch] Antigravity 경로를 찾을 수 없음. 시도한 경로:\n${found.triedPaths.join('\n')}`);
-    return false;
-  }
-
-  log(`[AutoRelaunch] Antigravity 경로: ${found.path} (via ${found.method})`);
-
-  // 임시 PowerShell 스크립트 생성
-  // Extension이 Antigravity 자식 프로세스이므로 직접 kill하면
-  // Extension도 함께 종료됨. 독립 프로세스에 위임한다.
-  const escaped = found.path.replace(/'/g, "''");
-  const psScript = [
-    `Start-Sleep -Milliseconds 1500`,
-    `Stop-Process -Name Antigravity -Force -ErrorAction SilentlyContinue`,
-    `Start-Sleep -Milliseconds 500`,
-    `Start-Process -FilePath '${escaped}' -ArgumentList '--remote-debugging-port=9222' -WindowStyle Normal`,
-  ].join('\n');
-
-  const scriptName = `antigravity-cdp-relaunch-${Date.now()}.ps1`;
-
-  // Windows 임시 디렉토리 경로(스크립트 실행용)와
-  // WSL에서 직접 쓸 수 있는 경로를 분리
-  let scriptPathWin: string;
-  let scriptPathLocal: string; // fs.writeFileSync에 사용할 경로
-
-  if (isWSL()) {
-    // powershell에서 Windows TEMP 경로를 가져와 WSL 경로로 변환
-    let winTemp = 'C:\\Windows\\Temp';
-    try {
-      const psOut = cp.execSync('powershell.exe -Command "$env:TEMP"', { encoding: 'utf8' }) as string;
-      winTemp = psOut.trim();
-    } catch { /* fallback */ }
-    scriptPathWin = `${winTemp}\\${scriptName}`;
-    // C:\Users\foo\... → /mnt/c/Users/foo/...
-    scriptPathLocal = winTemp
-      .replace(/^([A-Za-z]):\\/, (_, d) => `/mnt/${d.toLowerCase()}/`)
-      .replace(/\\/g, '/') + '/' + scriptName;
-  } else {
-    scriptPathWin = path.join(os.tmpdir(), scriptName);
-    scriptPathLocal = scriptPathWin;
-  }
-
-  // 스크립트 파일 작성 (WSL이든 Windows든 fs.writeFileSync 직접 사용)
-  try {
-    fs.writeFileSync(scriptPathLocal, psScript, 'utf8');
-    log(`[AutoRelaunch] 스크립트 작성 완료: ${scriptPathLocal}`);
-  } catch (err) {
-    log(`[AutoRelaunch] 스크립트 파일 작성 실패: ${err}`);
-    return false;
-  }
-
-  // 완전히 독립된 백그라운드 PowerShell 프로세스로 실행
-  // (Antigravity 프로세스 트리 밖 → VS Code가 종료돼도 계속 실행됨)
-  try {
-    if (isWSL()) {
-      // WSL: powershell.exe를 detached 없이 exec — 이미 별도 Windows 프로세스
-      log(`[AutoRelaunch] 독립 PS 스크립트 실행 (WSL): ${scriptPathWin}`);
-      cp.exec(`powershell.exe -WindowStyle Hidden -NonInteractive -ExecutionPolicy Bypass -File "${scriptPathWin}"`);
-    } else {
-      // Windows: Start-Process로 이중 래핑해 완전히 분리
-      log(`[AutoRelaunch] 독립 PS 스크립트 실행 (Windows): ${scriptPathWin}`);
-      const child = cp.spawn('powershell', [
-        '-WindowStyle', 'Hidden',
-        '-NonInteractive',
-        '-Command',
-        `Start-Process powershell -ArgumentList '-WindowStyle','Hidden','-NonInteractive','-ExecutionPolicy','Bypass','-File','${scriptPathWin}' -WindowStyle Hidden`,
-      ], { detached: true, stdio: 'ignore' });
-      child.unref();
-    }
-  } catch (err) {
-    log(`[AutoRelaunch] 외부 프로세스 실행 실패: ${err}`);
-    return false;
-  }
-
-  // 포트가 열릴 때까지 폴링 (DevToolsActivePort 파일 없이 TCP 직접 체크)
-  const host = isWSL() ? '127.0.0.1' : '127.0.0.1';
-  log(`[AutoRelaunch] 포트 9222 대기 중 (최대 ${waitSec}초)...`);
-  for (let i = 0; i < waitSec; i++) {
-    await delay(1000);
-    const portOpen = await isTcpPortOpen(host, 9222);
-    if (portOpen) {
-      log(`[AutoRelaunch] ✔ CDP 포트 9222 열림!`);
-      return true;
-    }
-    if (i < 3) {
-      log(`[AutoRelaunch] 재시작 대기 중... (${i + 1}s)`);
-    } else {
-      log(`[AutoRelaunch] 대기 중... (${i + 1}/${waitSec}s)`);
-    }
-  }
-
-  log('[AutoRelaunch] ✘ 타임아웃 — 포트가 열리지 않음');
-  return false;
-}
-
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ── 사용자 안내 (자동 재실행 먼저 시도) ────────────────────────────────────────
+// ── 사용자 안내 (AI MCP 프롬프트 복사) ────────────────────────────────────────
 
 async function handleCDPConnectError(failure: CDPConnectFailure) {
   if (!statusBarUI) return;
 
   const reason = failure.reason;
-  log(`[Autorun] CDP 연결 실패: ${reason} — 자동 재실행 시도 중...`);
-  statusBarUI.setConnecting(true);
-
-  // 자동 재실행 시도
-  const relaunched = await autoRelaunchWithCDP();
-  if (relaunched) {
-    // 재실행 성공 → 다시 연결 시도
-    try {
-      await buttonClicker?.stop();
-      await cdpConnection?.disconnect();
-      await cdpConnection?.connect();
-      await buttonClicker?.start();
-      isEnabled = true;
-      statusBarUI.setConnecting(false);
-      statusBarUI.setEnabled(true);
-      log('[AutoRelaunch] ✔ CDP 자동 재연결 완료! (API mode)');
-      return;
-    } catch (err) {
-      log(`[AutoRelaunch] 재연결 실패: ${err}`);
-    }
-  }
-
-  // 자동 재실행 실패 시 수동 안내 팝업
+  log(`[Autorun] CDP 연결 실패: ${reason}`);
   statusBarUI.setConnecting(false);
   statusBarUI.setNeedsSetup(true);
 
@@ -312,14 +151,15 @@ async function handleCDPConnectError(failure: CDPConnectFailure) {
 
   const selected = await vscode.window.showWarningMessage(
     message,
-    'CDP 모드로 재실행',
+    'AI에게 MCP 실행 요청',
     '설치 방법 보기',
     '진단 로그',
     '닫기'
   );
 
-  if (selected === 'CDP 모드로 재실행') {
-    await relaunchWithCDP();
+  if (selected === 'AI에게 MCP 실행 요청') {
+    await vscode.env.clipboard.writeText('Please run mcp_antigravity-powershell_launch_antigravity_cdp to start my editor in CDP mode.');
+    vscode.window.showInformationMessage('프롬프트가 복사되었습니다. AI 채팅창에 붙여넣어 에디터를 재실행하세요.');
   } else if (selected === '설치 방법 보기') {
     await showCDPSetupInstructions();
   } else if (selected === '진단 로그') {
@@ -327,44 +167,71 @@ async function handleCDPConnectError(failure: CDPConnectFailure) {
   }
 }
 
+// ── 자동 실행 (CDP Native Launch) ──────────────────────────────────────────────
+
+async function enableCDPNatively() {
+  if (statusBarUI) {
+    statusBarUI.setConnecting(true);
+  }
+  
+  const pathResult = await findAntigravityPath();
+  const exePath = pathResult.path;
+  const config = vscode.workspace.getConfiguration('antigravityAutorun');
+  const cdpPort = config.get<number>('cdpPort', 9222);
+
+  if (!exePath) {
+    vscode.window.showErrorMessage('Antigravity 실행 파일을 찾을 수 없습니다. 경로 설정이나 환경 변수를 확인해주세요.');
+    if (statusBarUI) statusBarUI.setNeedsSetup(true);
+    return;
+  }
+
+  log(`[Launcher] Launching Antigravity with CDP using port ${cdpPort}...`);
+  log(`[Launcher] Executable Path: ${exePath}`);
+
+  const psCommand = `& "${exePath}" --user-data-dir="$env:LOCALAPPDATA\\Temp\\AgCDPProfile" --remote-debugging-port=${cdpPort}`;
+
+  try {
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.ELECTRON_RUN_AS_NODE;
+
+    const agProcess = cp.spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", psCommand], {
+      detached: true,
+      stdio: 'ignore',
+      env: cleanEnv
+    });
+    agProcess.unref();
+
+    log(`[Launcher] Process spawned successfully.`);
+    vscode.window.showInformationMessage(`Antigravity가 포트 ${cdpPort}에서 CDP와 함께 실행되었습니다. 곧 자동 연결을 시도합니다...`);
+
+    // Give it some time to start up before reconnecting
+    setTimeout(() => {
+      reconnectCDP().catch(err => {
+        log(`[Launcher] Auto-reconnect failed: ${err}`);
+      });
+    }, 2000);
+
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    log(`[Launcher] Failed to launch CDP: ${message}`);
+    vscode.window.showErrorMessage(`Failed to launch CDP: ${message}`);
+    if (statusBarUI) statusBarUI.setNeedsSetup(true);
+  }
+}
+
 // ── 수동 재실행 (메뉴 명령) ───────────────────────────────────────────────────
 
 async function relaunchWithCDP() {
   const confirm = await vscode.window.showInformationMessage(
-    'Antigravity를 CDP 모드(--remote-debugging-port=9222)로 재실행합니다.',
+    'AI를 통해 Antigravity를 CDP 모드로 재실행하기 위한 프롬프트를 복사하시겠습니까?',
     { modal: true },
-    '재실행',
+    '복사하기',
     '취소'
   );
-  if (confirm !== '재실행') return;
+  if (confirm !== '복사하기') return;
 
-  log('[Relaunch] 수동 재실행 시작...');
-  statusBarUI?.setConnecting(true);
-
-  const relaunched = await autoRelaunchWithCDP(25);
-  if (relaunched) {
-    try {
-      await buttonClicker?.stop();
-      await cdpConnection?.disconnect();
-      await cdpConnection?.connect();
-      await buttonClicker?.start();
-      isEnabled = true;
-      statusBarUI?.setConnecting(false);
-      statusBarUI?.setEnabled(true);
-      log('[Relaunch] ✔ 재실행 및 CDP 연결 완료! (API mode)');
-      vscode.window.showInformationMessage('Antigravity Autorun: CDP 연결 완료!');
-      return;
-    } catch (err) {
-      log(`[Relaunch] 재연결 실패: ${err}`);
-    }
-  }
-
-  statusBarUI?.setConnecting(false);
-  statusBarUI?.setNeedsSetup(true);
-  const pathResult = await findAntigravityPath();
-  vscode.window.showErrorMessage(
-    `자동 재실행 실패. Antigravity 경로: ${pathResult.path ?? '찾을 수 없음'}. 수동으로 실행하고 Reconnect CDP를 눌러주세요.`
-  );
+  await vscode.env.clipboard.writeText('Please run mcp_antigravity-powershell_launch_antigravity_cdp to start my editor in CDP mode.');
+  vscode.window.showInformationMessage('프롬프트가 복사되었습니다. AI 채팅창에 붙여넣어 에디터를 재실행하세요.');
 }
 
 async function showCDPSetupInstructions() {
