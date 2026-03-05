@@ -2,7 +2,7 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Hands-free automation for Antigravity AI Agent. Auto-approves Run/Accept/Allow commands using CDP network interception. Zero latency, maximum stability.",
-  "version": "3.0.23",
+  "version": "3.0.25",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
