@@ -121,6 +121,11 @@ Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
 
 ## 📜 Release Notes
 
+### 3.2.1 (Windows Only)
+- **[PERFORMANCE]** Rewrote the Windows auto-restart launcher completely in Go (`relauncher.exe`).
+- **[PERFORMANCE]** Replaced the clunky 3-layer VBS->PowerShell->WMI wrapper with an uncompromising 1MB native executable calling Win32 `sysCall.CreateProcess`.
+- **[FIX]** Solved the 4-6 second restart delay. The editor now restarts almost instantly in CDP mode without environment variable poisoning.
+
 ### 3.1.0 (Windows Only)
 - **[NEW]** Fully automated "Restart Editor Now" button using WMI detached background process.
 - **[REMOVED]** Deprecated Setup Instructions and shortcut creation guides.
