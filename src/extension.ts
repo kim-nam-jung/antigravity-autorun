@@ -4,6 +4,7 @@ import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkD
 import { ButtonClicker } from './buttons/clicker';
 import { StatusBarUI } from './ui/statusBar';
 import { findAntigravityPath } from './launcher/pathFinder';
+import { createDesktopShortcut } from './utils/shortcut';
 import CDP from 'chrome-remote-interface';
 import { promisify } from 'util';
 import { isWSL } from './utils/os';
@@ -186,46 +187,10 @@ async function enableCDPNatively() {
   }
 
   deleteStaleDevToolsPortFile();
-  log(`[Launcher] Creating CDP shortcut...`);
-
-  const shortcutScript = `
-$WshShell = New-Object -ComObject WScript.Shell
-$Desktop = [Environment]::GetFolderPath('Desktop')
-$Shortcut = $WshShell.CreateShortcut("$Desktop\\Antigravity CDP Mode.lnk")
-$Shortcut.TargetPath = "${exePath}"
-$Shortcut.Arguments = "--remote-debugging-port=${cdpPort}"
-$Shortcut.WorkingDirectory = Split-Path "${exePath}"
-$Shortcut.Description = "Antigravity with CDP on port ${cdpPort}"
-$Shortcut.Save()
-Write-Output "Shortcut created"
-`.trim();
-
-  const encoded = Buffer.from(shortcutScript, 'utf16le').toString('base64');
-
-  try {
-    const result = await execAsync(`powershell.exe -NoProfile -EncodedCommand ${encoded}`);
-    log(`[Launcher] Shortcut created: ${result.stdout}`);
-
-    const action = await vscode.window.showInformationMessage(
-      `Shortcut "Antigravity CDP Mode" created on desktop.\n\n1. Close current Antigravity\n2. Double-click the desktop shortcut`,
-      'OK',
-      'Open Desktop'
-    );
-
-    if (action === 'Open Desktop') {
-      const desktopPath = process.env.USERPROFILE ? `${process.env.USERPROFILE}\\Desktop` : '';
-      if (desktopPath) {
-        await execAsync(`explorer.exe "${desktopPath}"`);
-      }
-    }
-
-    if (statusBarUI) statusBarUI.setNeedsSetup(false);
-
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log(`[Launcher] Failed to create shortcut: ${message}`);
-    vscode.window.showErrorMessage(`Failed to create shortcut: ${message}`);
-    if (statusBarUI) statusBarUI.setNeedsSetup(true);
+  
+  const success = await createDesktopShortcut(exePath, cdpPort, log);
+  if (statusBarUI) {
+    statusBarUI.setNeedsSetup(!success);
   }
 }
 async function relaunchWithCDP() {

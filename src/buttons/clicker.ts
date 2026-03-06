@@ -55,281 +55,37 @@ export class ButtonClicker {
     const autoScroll = this.config.get<boolean>('autoScroll', true);
     const blockedCommands = this.config.get<string[]>('blockedCommands', []);
 
-    const script = `
-      // Clean up any previous observer
-      if (window.__antigravityAutorunObserver) {
-        window.__antigravityAutorunObserver.disconnect();
-      }
-
-      const CONFIG = {
-        delay: ${delay},
-        autoScroll: ${autoScroll},
-        blockedCommands: ${JSON.stringify(blockedCommands)},
-      };
-
-      // Allow-specific patterns — always click these regardless of dialog context
-      const ALLOW_PATTERNS = [
-        /^allow once$/i,
-        /^allow this conversation$/i,
-        /^allow$/i,
-        /^allow always$/i,
-        /^yes$/i,
-        /^approve$/i,
-      ];
-
-      // General button patterns
-      const BUTTON_PATTERNS = [
-        /\\brun\\b/i,
-        /\\bretry\\b/i,
-        /\\bconfirm\\b/i,
-        /\\bexecute\\b/i,
-        /\\bapprove\\b/i,
-      ];
-
-      const EXCLUDE_PATTERNS = [
-        /^always run/i,
-        /run button/i,
-        /retry button/i,
-        /auto click settings/i,
-      ];
-
-      // Negative button patterns — if ANY sibling matches, the dialog has a cancel option
-      // which means this IS a confirmation dialog for "Run"
-      const NEGATIVE_PATTERNS = [
-        /^reject$/i,
-        /^decline$/i,
-        /^cancel$/i,
-        /^no$/i,
-        /^don'?t run/i,
-        /^skip$/i,
-        /^deny$/i,
-        /^block$/i,
-      ];
-
-      function isCommandBlocked(element) {
-        const parent = element.closest('[class*="command-body"], [class*="prompt"]');
-        if (!parent) return false;
-        const commandText = parent.textContent || '';
-        return CONFIG.blockedCommands.some(blocked =>
-          commandText.toLowerCase().includes(blocked.toLowerCase())
-        );
-      }
-
-      // Check if "Run" button is inside a confirmation dialog.
-      // A dialog is detected when any sibling button has a "negative" label
-      // (Reject / Decline / Cancel / No / Don't run / etc.).
-      function isInRunCommandDialog(element) {
-        // Walk up to find a container that acts as a dialog/group
-        // Try up to 15 levels to accommodate deeply nested Tailwind layouts
-        let container = element.parentElement;
-        for (let i = 0; i < 15 && container; i++) {
-          const siblings = container.querySelectorAll(
-            'button, [role="button"], .cursor-pointer, vscode-button'
-          );
-          const hasNegativeButton = Array.from(siblings).some(s =>
-            s !== element && NEGATIVE_PATTERNS.some(p => p.test((s.textContent || '').trim()))
-          );
-          if (hasNegativeButton) {
-            console.log('[Autorun] Found negative button sibling in parent depth:', i);
-            return true;
-          }
-          container = container.parentElement;
-        }
-
-        // Fallback: check if there's any text near the button that hints at a command dialog
-        // e.g. "Run command?", "Execute?", "Proceed?" in surrounding text
-        const nearbyText = (element.closest('[class*="dialog"], [class*="modal"], [class*="prompt"], [class*="confirm"], [class*="command"]') || element.parentElement || element)?.textContent || '';
-        if (/run command|execute|proceed|confirm run/i.test(nearbyText)) return true;
-
-        return false;
-      }
-
-      function isTargetButton(element) {
-        if (!element) return false;
-
-        // VS Code UI 사이드바/패널/트리 영역은 제외
-        // (Docker, Explorer, Git 등 확장 패널의 ▶ 버튼이 잘못 클릭되는 것 방지)
-        if (element.closest(
-          '.part.sidebar, .part.activitybar, .part.panel, ' +
-          '.monaco-list-row, .monaco-tl-row, ' +
-          '.pane-body, .split-view-view .pane-body'
-        )) {
-          return false;
-        }
-
-        // Skip disabled / invisible
-        if (
-          element.disabled ||
-          element.getAttribute('disabled') !== null ||
-          element.getAttribute('aria-disabled') === 'true' ||
-          element.closest('[disabled]') ||
-          element.closest('[aria-disabled="true"]') ||
-          element.getBoundingClientRect().width === 0 ||
-          getComputedStyle(element).visibility === 'hidden'
-        ) {
-          return false;
-        }
-
-        const tagName = element.tagName?.toLowerCase();
-        const role = element.getAttribute('role');
-        const rawText = (element.textContent || '').trim();
-        const text = [
-          rawText,
-          element.getAttribute('aria-label') || '',
-          element.getAttribute('title') || '',
-        ].join(' ').trim();
-
-        // Allow-specific buttons: match by text alone, no isClickable check needed
-        if (ALLOW_PATTERNS.some(p => p.test(rawText))) {
-          console.log('[Autorun] Allow button detected:', rawText);
-          return true;
-        }
-
-        const isClickable =
-          tagName === 'button' ||
-          tagName === 'vscode-button' ||
-          role === 'button' ||
-          element.classList.contains('cursor-pointer') ||
-          element.classList.contains('monaco-button') ||
-          element.classList.contains('monaco-text-button') ||
-          getComputedStyle(element).cursor === 'pointer';
-
-        if (!isClickable) return false;
-        if (!BUTTON_PATTERNS.some(p => p.test(text))) return false;
-        if (EXCLUDE_PATTERNS.some(p => p.test(text))) return false;
-
-        // "run" pattern: only click if inside Antigravity's "Run command?" dialog
-        if (/\\brun\\b/i.test(text) && !/\\bretry\\b/i.test(text)) {
-          if (!isInRunCommandDialog(element)) {
-            console.log('[Autorun] Run button found but NOT in dialog, skipping:', text);
-            return false;
-          }
-        }
-
-        if (isCommandBlocked(element)) {
-          console.log('[Autorun] Blocked command, skipping');
-          return false;
-        }
-
-        return true;
-      }
-
-      function clickButton(button) {
-        // --- 1. Attempt to scroll any chat/scrollable container to bottom ---
-        const scrollableContainer = button.closest('.overflow-y-auto, .scrollable, main, .chat-thread') || document.querySelector('.overflow-y-auto, main');
-        if (scrollableContainer) {
-          try { scrollableContainer.scrollTop = scrollableContainer.scrollHeight; } catch(e) {}
-        }
-
-        // --- 2. If there's an explicit "Scroll to Bottom" arrow button in the DOM, click it ---
-        // Antigravity often uses a floating button with an SVG or title="Scroll to bottom"
-        const downArrows = document.querySelectorAll('button[title*="bottom" i], button[aria-label*="bottom" i], .scroll-bottom-button, button svg path[d*="M16.59 8.59L12 13.17 7.41 8.59"]');
-        downArrows.forEach(arrow => {
-          const btn = arrow.closest('button') || arrow;
-          if (btn && typeof btn.click === 'function' && getComputedStyle(btn).visibility !== 'hidden') {
-            try { btn.click(); console.log('[Autorun] Clicked scroll-down arrow'); } catch(e) {}
-          }
-        });
-
-        if (CONFIG.autoScroll) {
-          try { button.scrollIntoView({ behavior: 'instant', block: 'end' }); } catch(e) {}
-        }
-
-        setTimeout(() => {
-          console.log('[Autorun] Clicking:', button.textContent?.trim() || button.tagName);
-
-          const rect = button.getBoundingClientRect();
-          const opts = { 
-            bubbles: true, 
-            cancelable: true, 
-            view: window,
-            clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2
-          };
-          
-          button.dispatchEvent(new PointerEvent('pointerdown', opts));
-          button.dispatchEvent(new MouseEvent('mousedown', opts));
-          button.dispatchEvent(new PointerEvent('pointerup', opts));
-          button.dispatchEvent(new MouseEvent('mouseup', opts));
-          button.click();
-
-          console.log('[Autorun] Click dispatched.');
-        }, CONFIG.delay + 100); // Increased delay slightly to allow scroll/arrow click to settle
-      }
-
-      // --- Queue with correct timing ---
-      const clickQueue = [];
-      let queueRunning = false;
-
-      function processQueue() {
-        if (queueRunning || clickQueue.length === 0) return;
-        queueRunning = true;
-
-        const button = clickQueue.shift();
-
-        if (document.body.contains(button) && button.getBoundingClientRect().width > 0) {
-          clickButton(button);
-          setTimeout(() => {
-            queueRunning = false;
-            processQueue();
-          }, CONFIG.delay + 50);
-        } else {
-          queueRunning = false;
-          processQueue();
-        }
-      }
-
-      function enqueueClick(button) {
-        if (!clickQueue.includes(button)) {
-          clickQueue.push(button);
-          processQueue();
-        }
-      }
-
-      function scanForButtons() {
-        // Include span/div/a/li for Antigravity custom components and notification actions
-        const candidates = document.querySelectorAll(
-          'button, vscode-button, [role="button"], span, div, a, li, .notification-action, .action-label'
-        );
-        candidates.forEach(el => {
-          if (isTargetButton(el)) enqueueClick(el);
-        });
-      }
-
-      window.__antigravityAutorunObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'attributes') {
-            const target = mutation.target;
-            if (target.nodeType === Node.ELEMENT_NODE && isTargetButton(target)) {
-              enqueueClick(target);
-            }
-            continue;
-          }
-
-          if (mutation.type === 'childList') {
-            for (const node of mutation.addedNodes) {
-              if (node.nodeType !== Node.ELEMENT_NODE) continue;
-              if (isTargetButton(node)) enqueueClick(node);
-
-              node.querySelectorAll?.('button, vscode-button, [role="button"]')
-                .forEach(btn => { if (isTargetButton(btn)) enqueueClick(btn); });
-            }
-          }
-        }
-      });
-
-      window.__antigravityAutorunObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['disabled', 'aria-disabled', 'class'],
-      });
-
-      window.__antigravityAutorunScan = scanForButtons;
-      scanForButtons();
-
-      console.log('[Autorun] Observer active');
+    // Pass configuration to window object
+    const configScript = `
+      window.__antigravityAutorunConfig = ${JSON.stringify({
+        delay,
+        autoScroll,
+        blockedCommands
+      })};
     `;
+    await this.connection.injectScript(configScript);
+
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Check if bundled via esbuild (__dirname is out) vs tsc (__dirname is out/buttons)
+    let scriptPath = path.join(__dirname, 'injected', 'clickObserver.js');
+    if (!fs.existsSync(scriptPath)) {
+      scriptPath = path.join(__dirname, '..', 'injected', 'clickObserver.js');
+    }
+
+    let script = '';
+    try {
+      const rawScript = fs.readFileSync(scriptPath, 'utf8');
+      // Inject dummy 'exports' object so tsc's CommonJS output works in browser
+      script = `
+        var exports = {};
+        ${rawScript}
+      `;
+    } catch (e) {
+      console.error('[Autorun] Failed to load observer script', scriptPath, e);
+      throw new Error(`Failed to load injected script: ${e}`);
+    }
 
     await this.connection.injectScript(script);
   }
