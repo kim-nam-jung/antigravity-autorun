@@ -215,22 +215,46 @@ export class ButtonClicker {
       }
 
       function clickButton(button) {
+        // --- 1. Attempt to scroll any chat/scrollable container to bottom ---
+        const scrollableContainer = button.closest('.overflow-y-auto, .scrollable, main, .chat-thread') || document.querySelector('.overflow-y-auto, main');
+        if (scrollableContainer) {
+          try { scrollableContainer.scrollTop = scrollableContainer.scrollHeight; } catch(e) {}
+        }
+
+        // --- 2. If there's an explicit "Scroll to Bottom" arrow button in the DOM, click it ---
+        // Antigravity often uses a floating button with an SVG or title="Scroll to bottom"
+        const downArrows = document.querySelectorAll('button[title*="bottom" i], button[aria-label*="bottom" i], .scroll-bottom-button, button svg path[d*="M16.59 8.59L12 13.17 7.41 8.59"]');
+        downArrows.forEach(arrow => {
+          const btn = arrow.closest('button') || arrow;
+          if (btn && typeof btn.click === 'function' && getComputedStyle(btn).visibility !== 'hidden') {
+            try { btn.click(); console.log('[Autorun] Clicked scroll-down arrow'); } catch(e) {}
+          }
+        });
+
         if (CONFIG.autoScroll) {
-          try { button.scrollIntoView({ behavior: 'instant', block: 'center' }); } catch(e) {}
+          try { button.scrollIntoView({ behavior: 'instant', block: 'end' }); } catch(e) {}
         }
 
         setTimeout(() => {
           console.log('[Autorun] Clicking:', button.textContent?.trim() || button.tagName);
 
-          // Supplement with mousedown/up for listeners that need them,
-          // then use native .click() as the definitive trigger.
-          const opts = { bubbles: true, cancelable: true, view: window };
+          const rect = button.getBoundingClientRect();
+          const opts = { 
+            bubbles: true, 
+            cancelable: true, 
+            view: window,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2
+          };
+          
+          button.dispatchEvent(new PointerEvent('pointerdown', opts));
           button.dispatchEvent(new MouseEvent('mousedown', opts));
+          button.dispatchEvent(new PointerEvent('pointerup', opts));
           button.dispatchEvent(new MouseEvent('mouseup', opts));
           button.click();
 
           console.log('[Autorun] Click dispatched.');
-        }, CONFIG.delay);
+        }, CONFIG.delay + 100); // Increased delay slightly to allow scroll/arrow click to settle
       }
 
       // --- Queue with correct timing ---
