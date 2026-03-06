@@ -8,10 +8,10 @@ Automatically approves **Run**, **Confirm**, and **Allow** commands in Antigravi
 
 ## 🚀 Features
 
-### **Zero-Latency API Approvals**
-- Intercepts `HandleCascadeUserInteraction` packets at the network level
-- Direct REST API calls to backend — **0ms delay**
-- Immune to CSS/DOM changes
+### **One-Click CDP Setup (Windows Only)**
+- Click "Restart Editor Now" button when prompted to auto-restart the editor in CDP mode.
+- Uses WMI detached processes to ensure reliable, clean environment re-launches.
+- No manual configuration needed.
 
 ### **One-Click CDP Setup**
 - Click "Launch CDP Mode" button to create desktop shortcut
@@ -38,13 +38,14 @@ code --install-extension njk.antigravity-autorun
 
 ---
 
-## 🎯 Quick Start
+## 🎯 Quick Start (Windows)
 
 1. **Install extension**
-2. **Click "Launch CDP Mode"** when prompted
-3. **Close Antigravity and double-click the desktop shortcut**
-4. Look for **`✓ Auto: ON`** in status bar
-5. Start using Antigravity Agent — interactions are auto-approved!
+2. **Click "Restart Editor Now"** when prompted to automatically relaunch with CDP.
+3. Look for **`✓ Auto: ON`** in status bar
+4. Start using Antigravity Agent — interactions are auto-approved!
+
+> ⚠️ **Note:** The auto-relaunch feature is currently fully supported on **Windows only**. Mac/Linux users must start Antigravity explicitly with the `--remote-debugging-port=9222` flag.
 
 ---
 
@@ -63,9 +64,8 @@ code --install-extension njk.antigravity-autorun
 
 - `Antigravity Autorun: Toggle ON/OFF`
 - `Antigravity Autorun: Reconnect CDP`
-- `Antigravity Autorun: Launch CDP Mode`
+- `Antigravity Autorun: Relaunch with CDP Mode`
 - `Antigravity Autorun: Diagnostic Log`
-- `Antigravity Autorun: Setup Instructions`
 
 ---
 
@@ -98,16 +98,13 @@ Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
 ## 🐛 Troubleshooting
 
 ### "CDP is disabled" error
-1. Click **"Launch CDP Mode"** button
-2. Close current Antigravity
-3. Use desktop shortcut to restart
-
-### Desktop shortcut not working
-1. Open Command Palette (`Ctrl+Shift+P`)
-2. Run `Antigravity Autorun: Setup Instructions`
-3. Follow manual setup guide
+1. Click **"Restart Editor Now"** button on the prompt to auto-relaunch.
 
 ### Still not working?
+1. Check `%TEMP%\\antigravity_relaunch.log` for any auto-restart errors.
+2. Run `Antigravity Autorun: Diagnostic Log`
+3. Check output for errors
+4. Report issue with log output
 1. Run `Antigravity Autorun: Diagnostic Log`
 2. Check output for errors
 3. Report issue with log output
@@ -117,12 +114,16 @@ Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
 ## 📋 Requirements
 
 - **Antigravity IDE** (VSCode fork with AI Agent)
-- **Windows** (PowerShell for CDP launcher)
+- **Windows OS** (VBScript/PowerShell WMI used for background launcher)
 - **CDP Port Access** (default: 9222)
 
 ---
 
 ## 📜 Release Notes
+
+### 3.1.0 (Windows Only)
+- **[NEW]** Fully automated "Restart Editor Now" button using WMI detached background process.
+- **[REMOVED]** Deprecated Setup Instructions and shortcut creation guides.
 
 ### 3.0.22
 - **[NEW]** Desktop shortcut creation for CDP mode

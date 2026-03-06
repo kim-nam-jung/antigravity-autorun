@@ -21,7 +21,7 @@ Write-Host "📦 Cleaning old .vsix files..."
 Remove-Item -Path ".\*.vsix" -ErrorAction SilentlyContinue
 
 Write-Host "📦 Packaging extension..."
-wsl -d Ubuntu-24.04 -e bash -c "cd /home/skawn1057/Development/antigravity-autorun && npx vsce package"
+wsl -d Ubuntu-24.04 -e bash -c "cd /mnt/c/Users/skawn/Development/antigravity-autorun && npx vsce package"
 
 $vsixFile = Get-ChildItem -Path ".\*.vsix" | Select-Object -First 1
 
@@ -51,7 +51,7 @@ if ($publish_choice -match "^[Yy]$") {
         # Publish to Open VSX Registry
         if ($ovsxToken) {
             Write-Host "🚀 Publishing $($vsixFile.Name) to Open VSX Registry..."
-            wsl -d Ubuntu-24.04 -e bash -c "cd /home/skawn1057/Development/antigravity-autorun && npx ovsx publish `"$($vsixFile.Name)`" -p $ovsxToken"
+            wsl -d Ubuntu-24.04 -e bash -c "cd /mnt/c/Users/skawn/Development/antigravity-autorun && npx ovsx publish `"$($vsixFile.Name)`" -p $ovsxToken"
             Write-Host "✅ Open VSX publish complete!" -ForegroundColor Green
         } else {
             Write-Host "⏭️  OVSX_TOKEN not found in .env file. Skipping Open VSX publish." -ForegroundColor Yellow

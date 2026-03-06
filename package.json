@@ -2,7 +2,7 @@
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
   "description": "Hands-free automation for Antigravity AI Agent. Auto-approves Run/Accept/Allow commands using CDP network interception. Zero latency, maximum stability.",
-  "version": "3.0.29",
+  "version": "3.1.0",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
@@ -45,10 +45,6 @@
       {
         "command": "antigravity-autorun.diagnose",
         "title": "Antigravity Autorun: Diagnose CDP Targets (Debug)"
-      },
-      {
-        "command": "antigravity-autorun.showSetupInstructions",
-        "title": "Antigravity Autorun: Show CDP Setup Instructions"
       },
       {
         "command": "antigravity-autorun.relaunchWithCDP",

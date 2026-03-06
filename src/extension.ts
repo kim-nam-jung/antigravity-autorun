@@ -4,7 +4,7 @@ import { CDPConnection, CDPConnectError, CDPConnectFailure, setCDPLogger, checkD
 import { ButtonClicker } from './buttons/clicker';
 import { StatusBarUI } from './ui/statusBar';
 import { findAntigravityPath } from './launcher/pathFinder';
-import { createDesktopShortcut } from './utils/shortcut';
+import { createDesktopShortcut, relaunchAntigravityWithCDP } from './utils/shortcut';
 import CDP from 'chrome-remote-interface';
 import { promisify } from 'util';
 import { isWSL } from './utils/os';
@@ -47,7 +47,6 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('antigravity-autorun.toggle', () => toggleAutorun()),
     vscode.commands.registerCommand('antigravity-autorun.reconnect', () => reconnectCDP()),
     vscode.commands.registerCommand('antigravity-autorun.diagnose', () => diagnoseCDP()),
-    vscode.commands.registerCommand('antigravity-autorun.showSetupInstructions', () => showCDPSetupInstructions()),
     vscode.commands.registerCommand('antigravity-autorun.relaunchWithCDP', () => relaunchWithCDP()),
     vscode.commands.registerCommand('antigravity-autorun.enableCDPNatively', () => enableCDPNatively()),
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -156,15 +155,15 @@ async function handleCDPConnectError(failure: CDPConnectFailure) {
 
   const selected = await vscode.window.showWarningMessage(
     message,
-    'Launch CDP Mode',
-    'Setup Instructions',
+    'Restart Editor Now',
+    'Create Desktop Shortcut',
     'Diagnostic Log',
     'Close'
   );
-  if (selected === 'Launch CDP Mode') {
+  if (selected === 'Restart Editor Now') {
+    await relaunchWithCDP();
+  } else if (selected === 'Create Desktop Shortcut') {
     await enableCDPNatively();
-  } else if (selected === 'Setup Instructions') {
-    await showCDPSetupInstructions();
   } else if (selected === 'Diagnostic Log') {
     await diagnoseCDP();
   }
@@ -194,62 +193,29 @@ async function enableCDPNatively() {
   }
 }
 async function relaunchWithCDP() {
-  const confirm = await vscode.window.showInformationMessage(
-    'Copy prompt to restart Antigravity in CDP mode via AI?',
+  const confirm = await vscode.window.showWarningMessage(
+    'This will restart the editor in CDP mode. Continue?',
     { modal: true },
-    'Copy Prompt',
+    'Restart Now',
     'Cancel'
   );
-  if (confirm !== 'Copy Prompt') return;
+  if (confirm !== 'Restart Now') return;
 
-  await vscode.env.clipboard.writeText('Please run mcp_antigravity-powershell_launch_antigravity_cdp to start my editor in CDP mode.');
-  vscode.window.showInformationMessage('Prompt copied. Paste it in AI chat to restart the editor.');
-}
+  const pathResult = await findAntigravityPath();
+  const exePath = pathResult.path;
+  const config = vscode.workspace.getConfiguration('antigravityAutorun');
+  const cdpPort = config.get<number>('cdpPort', 9222);
 
-async function showCDPSetupInstructions() {
-  const content = [
-    '# Antigravity Autorun — CDP 설정 가이드',
-    '',
-    'Antigravity Autorun 확장이 동작하려면 Antigravity(VSCode 포크)가',
-    '원격 디버깅 포트를 열고 실행되어야 합니다.',
-    '',
-    '---',
-    '',
-    '## 방법 1: 바탕화면 바로가기 수정 (권장)',
-    '',
-    '1. 바탕화면의 Antigravity 바로가기 아이콘을 **우클릭**합니다.',
-    '2. **속성(Properties)** 을 클릭합니다.',
-    '3. **대상(Target)** 필드 맨 끝에 다음을 추가합니다:',
-    '',
-    '   --remote-debugging-port=9222',
-    '',
-    '   예시:',
-    '   "C:\\\\Users\\\\skawn\\\\AppData\\\\Local\\\\Programs\\\\Antigravity\\\\Antigravity.exe" --remote-debugging-port=9222',
-    '',
-    '4. **확인**을 클릭하고 Antigravity를 **재시작**합니다.',
-    '',
-    '---',
-    '',
-    '## 방법 2: PowerShell에서 직접 실행',
-    '',
-    '```powershell',
-    '& "$env:LOCALAPPDATA\\Programs\\Antigravity\\Antigravity.exe" --remote-debugging-port=9222',
-    '```',
-    '',
-    '---',
-    '',
-    '## 검증 방법',
-    '',
-    'Antigravity 실행 후 브라우저에서 다음 URL 접속:',
-    '',
-    '  http://localhost:9222/json',
-    '',
-    '페이지 타겟 목록 JSON이 보이면 성공입니다.',
-    '',
-  ].join('\n');
+  if (!exePath) {
+    vscode.window.showErrorMessage('Antigravity executable not found.');
+    return;
+  }
 
-  const doc = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
-  await vscode.window.showTextDocument(doc, { preview: true });
+  deleteStaleDevToolsPortFile();
+  await relaunchAntigravityWithCDP(exePath, cdpPort, log);
+  
+  // Gracefully quit VS Code. The detached script will wait a few seconds then restart it.
+  await vscode.commands.executeCommand('workbench.action.quit');
 }
 
 // ── Autorun 제어 ──────────────────────────────────────────────────────────────
