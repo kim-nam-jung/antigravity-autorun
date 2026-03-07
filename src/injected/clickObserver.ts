@@ -35,13 +35,13 @@ interface Window {
     /^approve$/i,
   ];
 
-  // General button patterns
   const BUTTON_PATTERNS = [
     /\brun\b/i,
     /\bretry\b/i,
     /\bconfirm\b/i,
     /\bexecute\b/i,
     /\bapprove\b/i,
+    /\brequires input\b/i,
   ];
 
   const EXCLUDE_PATTERNS = [
@@ -70,6 +70,32 @@ interface Window {
     return CONFIG.blockedCommands.some((blocked: string) =>
       commandText.toLowerCase().includes(blocked.toLowerCase())
     );
+  }
+
+  function isCoveredByOverlay(button: HTMLElement): { covered: boolean; coveringElements: HTMLElement[] } {
+    const rect = button.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return { covered: false, coveringElements: [] };
+
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const topEl = document.elementFromPoint(cx, cy);
+
+    if (!topEl || button === topEl || button.contains(topEl) || topEl.contains(button)) {
+      return { covered: false, coveringElements: [] };
+    }
+
+    const coveringSet = new Set<HTMLElement>();
+    const points: [number, number][] = [
+      [cx, cy], [rect.left + 2, cy], [rect.right - 2, cy],
+      [cx, rect.top + 2], [cx, rect.bottom - 2],
+    ];
+    for (const [x, y] of points) {
+      const el = document.elementFromPoint(x, y) as HTMLElement;
+      if (el && el !== button && !button.contains(el) && !el.contains(button)) {
+        coveringSet.add(el);
+      }
+    }
+    return { covered: true, coveringElements: [...coveringSet] };
   }
 
   function isInRunCommandDialog(element: HTMLElement): boolean {
@@ -160,43 +186,53 @@ interface Window {
   }
 
   function clickButton(button: HTMLElement) {
-    const scrollableContainer = (button.closest ? button.closest('.overflow-y-auto, .scrollable, main, .chat-thread') : null) || document.querySelector('.overflow-y-auto, main');
-    if (scrollableContainer) {
-      try { scrollableContainer.scrollTop = scrollableContainer.scrollHeight; } catch(e) {}
-    }
-
-    const downArrows = document.querySelectorAll('button[title*="bottom" i], button[aria-label*="bottom" i], .scroll-bottom-button, button svg path[d*="M16.59 8.59L12 13.17 7.41 8.59"]');
-    downArrows.forEach(arrow => {
-      const btn = arrow.closest ? arrow.closest('button') || arrow : arrow;
-      if (btn && typeof (btn as any).click === 'function' && window.getComputedStyle(btn as Element).visibility !== 'hidden') {
-        try { (btn as any).click(); console.log('[Autorun] Clicked scroll-down arrow'); } catch(e) {}
-      }
-    });
-
-    if (CONFIG.autoScroll) {
-      try { button.scrollIntoView({ behavior: 'instant', block: 'end' }); } catch(e) {}
+    if (CONFIG.autoScroll && /\brequires input\b/i.test(button.textContent || '')) {
+      try { button.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
     }
 
     setTimeout(() => {
       console.log('[Autorun] Clicking:', button.textContent?.trim() || button.tagName);
+      const { covered, coveringElements } = isCoveredByOverlay(button);
+      const opts: MouseEventInit = { bubbles: true, cancelable: true, view: window };
 
-      const rect = button.getBoundingClientRect();
-      const opts = { 
-        bubbles: true, 
-        cancelable: true, 
-        view: window,
-        clientX: rect.left + rect.width / 2,
-        clientY: rect.top + rect.height / 2
-      };
-      
-      button.dispatchEvent(new PointerEvent('pointerdown', opts));
-      button.dispatchEvent(new MouseEvent('mousedown', opts));
-      button.dispatchEvent(new PointerEvent('pointerup', opts));
-      button.dispatchEvent(new MouseEvent('mouseup', opts));
-      button.click();
+      if (covered && coveringElements.length > 0) {
+        console.log('[Autorun] Button covered by', coveringElements.length, 'element(s).');
+        const saved = coveringElements.map(el => ({ el, original: el.style.pointerEvents }));
+        coveringElements.forEach(el => { el.style.pointerEvents = 'none'; });
+        try {
+          button.dispatchEvent(new PointerEvent('pointerdown', opts));
+          button.dispatchEvent(new MouseEvent('mousedown', opts));
+          button.dispatchEvent(new PointerEvent('pointerup', opts));
+          button.dispatchEvent(new MouseEvent('mouseup', opts));
+          button.click();
+        } finally {
+          requestAnimationFrame(() => {
+            saved.forEach(({ el, original }) => {
+              if (original) { el.style.pointerEvents = original; }
+              else { el.style.removeProperty('pointer-events'); }
+            });
+          });
+        }
+      } else {
+        const rect = button.getBoundingClientRect();
+        const coordOpts = { ...opts, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
+        button.dispatchEvent(new PointerEvent('pointerdown', coordOpts));
+        button.dispatchEvent(new MouseEvent('mousedown', coordOpts));
+        button.dispatchEvent(new PointerEvent('pointerup', coordOpts));
+        button.dispatchEvent(new MouseEvent('mouseup', coordOpts));
+        button.click();
+      }
 
-      console.log('[Autorun] Click dispatched.');
-    }, CONFIG.delay + 100);
+      // 폴백: 클릭 후에도 버튼이 남아있으면 focus+Enter 시도
+      setTimeout(() => {
+        if (document.body.contains(button) && button.getBoundingClientRect().width > 0) {
+          console.log('[Autorun] Button still present. Trying focus+Enter fallback.');
+          button.focus({ preventScroll: true });
+          button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+          button.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, bubbles: true }));
+        }
+      }, 300);
+    }, CONFIG.delay);
   }
 
   const clickQueue: HTMLElement[] = [];

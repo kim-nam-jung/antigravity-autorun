@@ -1,8 +1,8 @@
 {
   "name": "antigravity-autorun",
   "displayName": "Antigravity Autorun",
-  "description": "Hands-free automation for Antigravity AI Agent. Auto-approves Run/Accept/Allow commands using CDP network interception. Zero latency, maximum stability.",
-  "version": "3.2.2",
+  "description": "Hands-free automation for Antigravity AI Agent. Auto-approves Run/Allow commands using CDP network interception. Zero latency, maximum stability.",
+  "version": "3.2.3",
   "publisher": "njk",
   "icon": "icon.png",
   "engines": {
@@ -30,6 +30,10 @@
   ],
   "activationEvents": [
     "onStartupFinished"
+  ],
+  "extensionKind": [
+    "ui",
+    "workspace"
   ],
   "main": "./out/extension.js",
   "contributes": {

@@ -8,9 +8,9 @@ Automatically approves **Run**, **Confirm**, and **Allow** commands in Antigravi
 
 ## 🚀 Features
 
-### **One-Click CDP Setup (Windows Only)**
+### **One-Click CDP Setup (Windows & WSL Remote)**
 - Click "Restart Editor Now" button when prompted to auto-restart the editor in CDP mode.
-- Uses WMI detached processes to ensure reliable, clean environment re-launches.
+- Uses native detached processes to ensure reliable, clean environment re-launches across Windows and Ubuntu WSL.
 - No manual configuration needed.
 
 ### **One-Click CDP Setup**
@@ -45,7 +45,7 @@ code --install-extension njk.antigravity-autorun
 3. Look for **`✓ Auto: ON`** in status bar
 4. Start using Antigravity Agent — interactions are auto-approved!
 
-> ⚠️ **Note:** The auto-relaunch feature is currently fully supported on **Windows only**. Mac/Linux users must start Antigravity explicitly with the `--remote-debugging-port=9222` flag.
+> ⚠️ **Note:** The auto-relaunch feature is supported on **Windows and Ubuntu Remote (WSL)** workspaces natively. Mac/Linux desktop users must start Antigravity explicitly with the `--remote-debugging-port=9222` flag.
 
 ---
 
@@ -81,16 +81,16 @@ code --install-extension njk.antigravity-autorun
 
 ## 📝 How It Works
 
-1. **Network Sniffing**: Uses CDP Network Domain to intercept WebSocket messages
-2. **Pattern Matching**: Detects `HandleCascadeUserInteraction` packets
-3. **Direct API Call**: Sends approval via backend REST API
-4. **Zero Dependency**: No DOM observation, no mouse simulation
+1. **CDP Connection**: Connects to the Antigravity IDE using Chrome DevTools Protocol.
+2. **Script Injection**: Injects a lightweight `MutationObserver` script.
+3. **DOM Detection**: Detects target buttons (Run, Approve, requires input, etc.) safely in the DOM, including fallback logic for handling overlays.
+4. **Native Click**: Simulates exact user interactions with PointerEvents.
 
 **Architecture:**
 ```
-Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
-                                              ↓
-                                         Instant Approval
+Antigravity Agent → UI Render → MutationObserver Script
+                                        ↓
+                                  Instant Approval
 ```
 
 ---
@@ -114,14 +114,18 @@ Antigravity Agent → Backend API → WebSocket → CDP Network Sniffer
 ## 📋 Requirements
 
 - **Antigravity IDE** (VSCode fork with AI Agent)
-- **Windows OS** (VBScript/PowerShell WMI used for background launcher)
+- **Windows OS or WSL Remote** (Native Go background launcher used for clean restarts)
 - **CDP Port Access** (default: 9222)
 
 ---
 
 ## 📜 Release Notes
 
-### 3.2.1 (Windows Only)
+### 3.2.3
+- **[NEW]** Added full official support for **Ubuntu Remote (WSL)** workspaces. The extension now intelligently runs on the local Windows UI to bypass Linux network isolation.
+- **[FIX]** Background Go relauncher now properly handles WSL path mappings (`/mnt/c/...` to `C:\...`).
+
+### 3.2.1
 - **[PERFORMANCE]** Rewrote the Windows auto-restart launcher completely in Go (`relauncher.exe`).
 - **[PERFORMANCE]** Replaced the clunky 3-layer VBS->PowerShell->WMI wrapper with an uncompromising 1MB native executable calling Win32 `sysCall.CreateProcess`.
 - **[FIX]** Solved the 4-6 second restart delay. The editor now restarts almost instantly in CDP mode without environment variable poisoning.

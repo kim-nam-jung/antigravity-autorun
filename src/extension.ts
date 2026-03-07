@@ -242,7 +242,7 @@ async function startAutorun() {
       await buttonClicker.start();
       isEnabled = true;
       statusBarUI.setEnabled(true);
-      log(`[Autorun] ON (API mode) — connected to CDP port ${cdpConnection.getPort()}`);
+      log(`[Autorun] ON — connected to CDP port ${cdpConnection.getPort()}`);
       return;
     } catch (error) {
       // CDPConnectError: 영구적 실패 → 자동 재실행 시도
@@ -296,7 +296,7 @@ async function reconnectCDP() {
     isEnabled = true;
     statusBarUI.setConnecting(false);
     statusBarUI.setEnabled(true);
-    log('[Reconnect] Manual reconnect success (API mode)');
+    log('[Reconnect] Manual reconnect success');
     vscode.window.showInformationMessage('CDP reconnected');
   } catch (error) {
     statusBarUI.setConnecting(false);

@@ -97,7 +97,21 @@ func main() {
 	}
 
 	exePath := os.Args[1]
-	args := os.Args[1:]
+
+	// WSL Path Translation Check
+	// If the path starts with /mnt/c/ (common in WSL), convert it to C:\
+	if strings.HasPrefix(exePath, "/mnt/") && len(exePath) >= 7 {
+		driveLetter := strings.ToUpper(string(exePath[5]))
+		// Create Windows path: C:\...
+		winPath := driveLetter + ":" + strings.ReplaceAll(exePath[6:], "/", "\\")
+		logmsg(fmt.Sprintf("Translated WSL path %s to Windows path %s", exePath, winPath))
+		exePath = winPath
+	}
+
+	args := []string{exePath}
+	if len(os.Args) > 2 {
+		args = append(args, os.Args[2:]...)
+	}
 
 	logmsg(fmt.Sprintf("Starting Go relauncher sequence for %s", exePath))
 

@@ -16,12 +16,7 @@ export function toWSLPath(winPath: string): string {
 }
 
 export function getWindowsHost(): string {
-  try {
-    const resolv = fs.readFileSync('/etc/resolv.conf', 'utf8');
-    const match = resolv.match(/nameserver\s+([\d.]+)/);
-    if (match) return match[1];
-  } catch (e) {
-    // Ignore file read error
-  }
+  // WSL2 natively supports localhost forwarding to Windows host.
+  // Chrome CDP binds strictly to 127.0.0.1, making the Hyper-V nameserver IP fail.
   return '127.0.0.1';
 }
